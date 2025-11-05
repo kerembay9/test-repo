@@ -1,1 +1,0 @@
-npx create-next-app@latest . --typescript --tailwind --app --use-npm
