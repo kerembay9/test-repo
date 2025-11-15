@@ -6,9 +6,9 @@ export default function Counter() {
   return (
     <div>
       <div id="counter">{count}</div>
-      <button onClick={() => setCount(count + 1)}>Increment</button>
-      <button onClick={() => setCount(count - 1)}>Decrement</button>
-      <button onClick={() => setCount(0)}>Reset</button>
+      <Button onClick={() => setCount(count + 1)} variant="default">Increment</Button>
+      <Button onClick={() => setCount(count - 1)} variant="secondary">Decrement</Button>
+      <Button onClick={() => setCount(0)} variant="outline">Reset</Button>
     </div>
   );
 }
