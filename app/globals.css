@@ -1,8 +1,15 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: hsl(220, 70%, 50%);
+  --secondary: hsl(280, 60%, 50%);
+  --accent: hsl(340, 75%, 55%);
+  --background-color: var(--background);
+  --text-color: var(--foreground);
 }
 
 @theme inline {
