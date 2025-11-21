@@ -6,11 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export default function Counter() {
   const [count, setCount] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const updateCount = (newCount: number) => {
     setCount(newCount);
-    setLastUpdated(new Date().toLocaleString());
   };
 
   return (
@@ -20,7 +18,6 @@ export default function Counter() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center justify-center h-full bg-background">
-          <div className="mb-2">Last Updated: {lastUpdated ? lastUpdated : "Never"}</div>
           <div className="text-4xl font-bold text-primary">{count}</div>
         </div>
         <Button onClick={() => updateCount(count + 1)} variant="default">
