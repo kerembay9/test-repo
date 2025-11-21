@@ -11,8 +11,33 @@ export default function Counter() {
     setCount(newCount);
   };
 
-  return (
+  useEffect(() => {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString();
+  setLastUpdated(timeString);
+}, [count]);
+
+useEffect(() => {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString();
+  setLastUpdated(timeString);
+}, [count]);
+
+useEffect(() => {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString();
+  setLastUpdated(timeString);
+}, [count]);
+
+return (
     <Card className="w-full h-screen">
+    
+ {/* Update the last updated timestamp dynamically */}
+ useEffect(() => {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString();
+  setLastUpdated(timeString);
+}, [count]);
       <CardHeader>
         <CardTitle>Counter App</CardTitle>
       </CardHeader>
@@ -30,6 +55,8 @@ export default function Counter() {
           Reset
         </Button>
       </CardContent>
+      <div className="mt-4 text-center">Last Updated: {lastUpdated}</div>
+    </Card>
     </Card>
   );
 }
