@@ -1,43 +1,24 @@
 "use client";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export default function Counter() {
   const [count, setCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState("");
 
   const updateCount = (newCount: number) => {
     setCount(newCount);
   };
 
   useEffect(() => {
-  const now = new Date();
-  const timeString = now.toLocaleTimeString();
-  setLastUpdated(timeString);
-}, [count]);
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    setLastUpdated(timeString);
+  }, [count]);
 
-useEffect(() => {
-  const now = new Date();
-  const timeString = now.toLocaleTimeString();
-  setLastUpdated(timeString);
-}, [count]);
-
-useEffect(() => {
-  const now = new Date();
-  const timeString = now.toLocaleTimeString();
-  setLastUpdated(timeString);
-}, [count]);
-
-return (
+  return (
     <Card className="w-full h-screen">
-    
- {/* Update the last updated timestamp dynamically */}
- useEffect(() => {
-  const now = new Date();
-  const timeString = now.toLocaleTimeString();
-  setLastUpdated(timeString);
-}, [count]);
       <CardHeader>
         <CardTitle>Counter App</CardTitle>
       </CardHeader>
@@ -56,7 +37,6 @@ return (
         </Button>
       </CardContent>
       <div className="mt-4 text-center">Last Updated: {lastUpdated}</div>
-    </Card>
     </Card>
   );
 }
