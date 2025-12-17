@@ -23,18 +23,16 @@ export default function Counter() {
         <CardTitle>Counter App</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center h-full bg-background">
+        <div className="flex flex-col items-center justify-center h-64 w-full bg-background">
           <div className="text-4xl font-bold text-primary">{count}</div>
         </div>
-        <Button onClick={() => updateCount(count + 1)} variant="default">
-          Increment
-        </Button>
-        <Button onClick={() => updateCount(count - 1)} variant="secondary">
-          Decrement
-        </Button>
-        <Button onClick={() => updateCount(0)} variant="outline">
-          Reset
-        </Button>
+        <div className="flex space-x-2 mb-4">
+          <Button onClick={() => updateCount(count + 1)}>Increment</Button>
+        </div>
+        <div className="flex space-x-2">
+          <Button onClick={() => updateCount(count - 1)}>Decrement</Button>
+          <Button onClick={() => updateCount(0)} className="ml-2">Reset</Button>
+        </div>
       </CardContent>
       <div className="mt-4 text-center">Last Updated: {lastUpdated}</div>
     </Card>
