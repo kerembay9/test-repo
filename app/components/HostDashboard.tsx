@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/app/components/ui/button";
 import {
   Card,
@@ -154,7 +155,21 @@ export default function HostDashboard() {
   }, [live, speakers]);
 
   useEffect(() => {
-    setJoinUrl(`${window.location.origin}/speaker`);
+    // Build a join URL phones can reach: the LAN IP from the server, not the
+    // localhost the host page is served on. Fall back to the page origin.
+    const fallback = `${window.location.origin}/speaker`;
+    setJoinUrl(fallback);
+    void fetch("/api/host-info")
+      .then((r) => r.json() as Promise<{ addresses: string[] }>)
+      .then(({ addresses }) => {
+        const ip = addresses?.[0];
+        if (!ip) return;
+        const port = window.location.port ? `:${window.location.port}` : "";
+        setJoinUrl(`${window.location.protocol}//${ip}${port}/speaker`);
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
   }, []);
 
   // Keep the scrub bar moving while playing.
@@ -729,9 +744,18 @@ export default function HostDashboard() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            On each phone (same Wi-Fi), open this address in a browser and tap
-            <span className="text-foreground font-medium"> Join</span>:
+            Open the <span className="text-foreground font-medium">Surround
+            Speaker</span> app on each phone (same Wi-Fi) and{" "}
+            <span className="text-foreground font-medium">scan this code</span> —
+            or open the address below in a browser and tap Join.
           </p>
+          {joinUrl && (
+            <div className="flex justify-center py-2">
+              <div className="rounded-lg bg-white p-3">
+                <QRCodeSVG value={joinUrl} size={168} marginSize={0} />
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <code className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-sm break-all">
               {joinUrl || "…"}
