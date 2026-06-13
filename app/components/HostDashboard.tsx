@@ -26,6 +26,11 @@ const BUNDLED_TRACK: TrackInfo = {
   url: "/testsound.mp3",
 };
 
+// Outputs that route back into the captured loopback and cause feedback.
+function isLoopbackOutput(label: string): boolean {
+  return /blackhole|multi-output|aggregate|soundflower|loopback/i.test(label);
+}
+
 function fmt(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) sec = 0;
   const m = Math.floor(sec / 60);
@@ -312,30 +317,54 @@ export default function HostDashboard() {
   const enableMonitor = () =>
     guard(async () => {
       if (!captureRef.current) throw new Error("Start streaming first.");
+      const out = outputs.find((d) => d.deviceId === outputId);
+      // Refuse any output that can route back into the captured loopback, or
+      // the monitor will feed BlackHole and scream. Require an explicit,
+      // physical speaker chosen via setSinkId.
+      if (!outputId || !out) {
+        throw new Error(
+          "Pick your real speakers in 'App output' first (not the default — " +
+            "with BlackHole as system output, default loops back).",
+        );
+      }
+      if (isLoopbackOutput(out.label)) {
+        throw new Error(
+          `"${out.label}" feeds the capture and will feed back. Pick your ` +
+            "physical speakers/headphones instead.",
+        );
+      }
       if (!engineRef.current) engineRef.current = new AudioEngine();
       const engine = engineRef.current;
       await engine.unlock();
-      if (outputId) {
-        const ok = await engine.setOutputDevice(outputId);
-        if (!ok) {
-          setErr(
-            "This browser can't pick an output device (needs Chrome). Set your " +
-              "Mac output to the real speakers and capture must use BlackHole.",
-          );
-        }
+      const routed = await engine.setOutputDevice(outputId);
+      if (!routed) {
+        throw new Error(
+          "This browser can't route output to a chosen device (needs Chrome). " +
+            "Without it the monitor would feed back, so it's disabled here.",
+        );
       }
       engine.setTrimMs(hostTrimMs);
       engine.attachStream(captureRef.current);
       setMonitorOn(true);
     });
 
-  // Live host-delay slider + output device take effect immediately.
+  const disableMonitor = () => {
+    engineRef.current?.detachStream();
+    setMonitorOn(false);
+  };
+
+  // Live host-delay slider takes effect immediately.
   useEffect(() => {
     if (monitorOn) engineRef.current?.setTrimMs(hostTrimMs);
   }, [hostTrimMs, monitorOn]);
+  // Changing output while monitoring: re-route, but never to a loopback device.
   useEffect(() => {
-    if (monitorOn && outputId) void engineRef.current?.setOutputDevice(outputId);
-  }, [outputId, monitorOn]);
+    if (!monitorOn || !outputId) return;
+    const out = outputs.find((d) => d.deviceId === outputId);
+    if (out && !isLoopbackOutput(out.label)) {
+      void engineRef.current?.setOutputDevice(outputId);
+    }
+  }, [outputId, monitorOn, outputs]);
 
   // Tear streaming down if the host page unmounts.
   useEffect(() => {
@@ -559,10 +588,15 @@ export default function HostDashboard() {
                   </div>
                 ) : (
                   <>
-                    <label className="text-sm flex justify-between">
-                      <span>Delay</span>
-                      <span className="tabular-nums">{hostTrimMs} ms</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm flex-1 flex justify-between pr-3">
+                        <span>Delay</span>
+                        <span className="tabular-nums">{hostTrimMs} ms</span>
+                      </label>
+                      <Button size="sm" variant="ghost" onClick={disableMonitor}>
+                        Turn off
+                      </Button>
+                    </div>
                     <input
                       type="range"
                       min={0}
