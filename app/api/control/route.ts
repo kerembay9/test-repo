@@ -1,0 +1,96 @@
+// Transport control endpoint used by the host UI. Mutations to playback state
+// happen here and are then pushed to all devices over SSE. Position is always
+// re-anchored to the server clock, with a small lead time so every speaker has
+// a chance to schedule the start at the same wall-clock instant.
+
+import {
+  broadcast,
+  getSnapshot,
+  getTransport,
+  setTransport,
+  touchSpeaker,
+} from "@/lib/sync/server-store";
+import { positionAt, type TrackInfo } from "@/lib/sync/types";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/** Scheduling lead: how far in the future a (re)start is anchored. */
+const LEAD_MS = 600;
+
+interface ControlBody {
+  action: "setTrack" | "play" | "pause" | "seek" | "stop" | "heartbeat";
+  track?: TrackInfo;
+  positionSec?: number;
+  speakerId?: string;
+  speakerName?: string;
+}
+
+export async function POST(req: Request) {
+  let body: ControlBody;
+  try {
+    body = (await req.json()) as ControlBody;
+  } catch {
+    return Response.json({ error: "invalid JSON" }, { status: 400 });
+  }
+
+  const now = Date.now();
+  const t = getTransport();
+
+  switch (body.action) {
+    case "setTrack": {
+      if (!body.track) {
+        return Response.json({ error: "track required" }, { status: 400 });
+      }
+      setTransport({
+        track: body.track,
+        isPlaying: false,
+        positionSec: 0,
+        anchorServerTime: now,
+      });
+      break;
+    }
+    case "play": {
+      if (!t.track) {
+        return Response.json({ error: "no track loaded" }, { status: 409 });
+      }
+      const resumeAt = body.positionSec ?? positionAt(t, now);
+      setTransport({
+        isPlaying: true,
+        positionSec: resumeAt,
+        anchorServerTime: now + LEAD_MS,
+      });
+      break;
+    }
+    case "pause": {
+      setTransport({
+        isPlaying: false,
+        positionSec: positionAt(t, now),
+        anchorServerTime: now,
+      });
+      break;
+    }
+    case "seek": {
+      const pos = Math.max(0, body.positionSec ?? 0);
+      setTransport({
+        positionSec: pos,
+        anchorServerTime: t.isPlaying ? now + LEAD_MS : now,
+      });
+      break;
+    }
+    case "stop": {
+      setTransport({ isPlaying: false, positionSec: 0, anchorServerTime: now });
+      break;
+    }
+    case "heartbeat": {
+      if (body.speakerId) touchSpeaker(body.speakerId, body.speakerName);
+      // Heartbeats don't change transport; avoid a version bump.
+      return Response.json(getSnapshot());
+    }
+    default:
+      return Response.json({ error: "unknown action" }, { status: 400 });
+  }
+
+  broadcast();
+  return Response.json(getSnapshot());
+}

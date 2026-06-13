@@ -1,9 +1,9 @@
-import Counter from "./components/Counter";
+import HostDashboard from "./components/HostDashboard";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <Counter />
+      <HostDashboard />
     </main>
   );
 }
