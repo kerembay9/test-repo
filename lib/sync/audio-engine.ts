@@ -80,6 +80,24 @@ export class AudioEngine {
     if (this.ctx.state !== "running") await this.ctx.resume();
   }
 
+  /**
+   * Route output to a specific device (Chrome AudioContext.setSinkId). Used on
+   * the host so it can monitor a captured loopback through its real speakers
+   * while capturing from a different (BlackHole) device. No-op if unsupported.
+   */
+  async setOutputDevice(deviceId: string): Promise<boolean> {
+    const ctx = this.ctx as AudioContext & {
+      setSinkId?: (id: string) => Promise<void>;
+    };
+    if (typeof ctx.setSinkId !== "function") return false;
+    try {
+      await ctx.setSinkId(deviceId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async loadTrack(url: string): Promise<number> {
     const res = await fetch(url, { cache: "force-cache" });
     const bytes = await res.arrayBuffer();

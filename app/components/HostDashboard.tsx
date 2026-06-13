@@ -75,6 +75,12 @@ export default function HostDashboard() {
   const [hostId] = useState(() => randomId());
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
   const [inputId, setInputId] = useState("");
+  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [outputId, setOutputId] = useState("");
+  // Monitor the captured audio locally (through the delay node) so the Mac's own
+  // output can be delayed to line up with the WebRTC-lagged phones.
+  const [monitorOn, setMonitorOn] = useState(false);
+  const [hostTrimMs, setHostTrimMs] = useState(0);
   // Local intent to stream, so the host's signaling mailbox opens immediately
   // instead of waiting for the `live` flag to round-trip through a snapshot.
   const [streaming, setStreaming] = useState(false);
@@ -115,6 +121,7 @@ export default function HostDashboard() {
       const devs = await navigator.mediaDevices.enumerateDevices();
       const found = devs.filter((d) => d.kind === "audioinput");
       setInputs(found);
+      setOutputs(devs.filter((d) => d.kind === "audiooutput"));
       if (found.every((d) => !d.label)) {
         setErr("Inputs found but unlabeled — permission may still be pending.");
       }
@@ -288,11 +295,43 @@ export default function HostDashboard() {
     guard(async () => {
       broadcasterRef.current?.stop();
       broadcasterRef.current = null;
+      engineRef.current?.detachStream();
+      setMonitorOn(false);
       captureRef.current?.getTracks().forEach((t) => t.stop());
       captureRef.current = null;
       setStreaming(false);
       await sendControl({ action: "endLive" });
     });
+
+  // Play the captured stream locally through the delay node so the Mac's own
+  // output can be pushed back to match the phones.
+  const enableMonitor = () =>
+    guard(async () => {
+      if (!captureRef.current) throw new Error("Start streaming first.");
+      if (!engineRef.current) engineRef.current = new AudioEngine();
+      const engine = engineRef.current;
+      await engine.unlock();
+      if (outputId) {
+        const ok = await engine.setOutputDevice(outputId);
+        if (!ok) {
+          setErr(
+            "This browser can't pick an output device (needs Chrome). Set your " +
+              "Mac output to the real speakers and capture must use BlackHole.",
+          );
+        }
+      }
+      engine.setTrimMs(hostTrimMs);
+      engine.attachStream(captureRef.current);
+      setMonitorOn(true);
+    });
+
+  // Live host-delay slider + output device take effect immediately.
+  useEffect(() => {
+    if (monitorOn) engineRef.current?.setTrimMs(hostTrimMs);
+  }, [hostTrimMs, monitorOn]);
+  useEffect(() => {
+    if (monitorOn && outputId) void engineRef.current?.setOutputDevice(outputId);
+  }, [outputId, monitorOn]);
 
   // Tear streaming down if the host page unmounts.
   useEffect(() => {
@@ -462,15 +501,69 @@ export default function HostDashboard() {
         </CardHeader>
         <CardContent className="space-y-3">
           {live ? (
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm">
-                <span className="text-red-500">●</span> Streaming this Mac&apos;s
-                audio to {speakers.length} speaker
-                {speakers.length === 1 ? "" : "s"}.
-              </span>
-              <Button variant="outline" disabled={busy} onClick={() => void stopLive()}>
-                Stop streaming
-              </Button>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">
+                  <span className="text-red-500">●</span> Streaming this
+                  Mac&apos;s audio to {speakers.length} speaker
+                  {speakers.length === 1 ? "" : "s"}.
+                </span>
+                <Button variant="outline" disabled={busy} onClick={() => void stopLive()}>
+                  Stop streaming
+                </Button>
+              </div>
+
+              <div className="rounded-md border p-3 space-y-3">
+                <p className="text-sm font-medium">Delay this Mac to match phones</p>
+                <p className="text-xs text-muted-foreground">
+                  Phones lag by WebRTC&apos;s buffer, so this Mac sounds early. To
+                  delay it, the app plays the captured audio to your real speakers
+                  through a delay. Set the Mac&apos;s system output to{" "}
+                  <span className="text-foreground font-medium">BlackHole only</span>{" "}
+                  (not the Multi-Output), then pick your real speakers as the app
+                  output below so it doesn&apos;t feed back.
+                </p>
+
+                {!monitorOn ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      className="rounded-md border bg-background px-2 py-2 text-sm max-w-[14rem]"
+                      value={outputId}
+                      onFocus={() => void refreshInputs()}
+                      onChange={(e) => setOutputId(e.target.value)}
+                    >
+                      <option value="">App output: system default…</option>
+                      {outputs.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || "Unlabeled output"}
+                        </option>
+                      ))}
+                    </select>
+                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void enableMonitor()}>
+                      Play on this Mac (delayed)
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <label className="text-sm flex justify-between">
+                      <span>Delay</span>
+                      <span className="tabular-nums">{hostTrimMs} ms</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1000}
+                      step={5}
+                      value={hostTrimMs}
+                      onChange={(e) => setHostTrimMs(Number(e.target.value))}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Nudge up until this Mac lines up with the phones by ear.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <>
