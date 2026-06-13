@@ -88,17 +88,38 @@ export default function HostDashboard() {
   // Device labels (e.g. "BlackHole 2ch") are hidden until the page has been
   // granted audio permission once, so prime it before listing inputs.
   const refreshInputs = useCallback(async () => {
+    setErr(null);
+    // getUserMedia/enumerateDevices only exist in a secure context. Over plain
+    // HTTP on a LAN IP, navigator.mediaDevices is undefined.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErr(
+        "Audio capture needs a secure context. Open this host page at " +
+          "http://localhost:3002 on the Mac itself (not the 192.168.x.x LAN " +
+          "address), or serve it over HTTPS.",
+      );
+      return;
+    }
     try {
       const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
       tmp.getTracks().forEach((t) => t.stop());
-    } catch {
-      /* permission denied; labels stay blank but ids still work */
+    } catch (e) {
+      setErr(
+        e instanceof Error && e.name === "NotAllowedError"
+          ? "Microphone permission was blocked — it's needed to list and capture audio inputs. Allow it in the address-bar site settings and retry."
+          : "Could not access audio inputs: " +
+              (e instanceof Error ? e.message : String(e)),
+      );
+      return;
     }
     try {
       const devs = await navigator.mediaDevices.enumerateDevices();
-      setInputs(devs.filter((d) => d.kind === "audioinput"));
-    } catch {
-      /* enumeration unavailable */
+      const found = devs.filter((d) => d.kind === "audioinput");
+      setInputs(found);
+      if (found.every((d) => !d.label)) {
+        setErr("Inputs found but unlabeled — permission may still be pending.");
+      }
+    } catch (e) {
+      setErr("enumerateDevices failed: " + (e instanceof Error ? e.message : ""));
     }
   }, []);
 
