@@ -24,6 +24,8 @@ interface Store {
   subscribers: Set<Subscriber>;
   /** WebRTC signaling mailboxes, keyed by peer id. */
   signalSinks: Map<string, SignalSink>;
+  /** Messages addressed to a peer whose mailbox isn't open yet. */
+  signalQueue: Map<string, SignalMessage[]>;
   version: number;
 }
 
@@ -44,6 +46,7 @@ function createStore(): Store {
     tracks: new Map(),
     subscribers: new Set(),
     signalSinks: new Map(),
+    signalQueue: new Map(),
     version: 0,
   };
 }
@@ -54,6 +57,7 @@ const store: Store = g.__surroundStore ?? (g.__surroundStore = createStore());
 // Retrofit fields onto a store that was created (and cached on globalThis) by an
 // older build before a hot-reload, so newly added state isn't left undefined.
 store.signalSinks ??= new Map();
+store.signalQueue ??= new Map();
 store.transport.live ??= false;
 store.transport.hostId ??= null;
 
@@ -140,22 +144,44 @@ export function getTrack(id: string): StoredTrack | undefined {
 
 // --- WebRTC signaling relay -------------------------------------------------
 
+const SIGNAL_QUEUE_MAX = 64;
+
 export function addSignalSink(id: string, sink: SignalSink): () => void {
   store.signalSinks.set(id, sink);
+  // Flush anything that arrived before this mailbox opened (connection-setup
+  // race: an offer/answer can be relayed before the peer's stream connects).
+  const queued = store.signalQueue.get(id);
+  if (queued) {
+    store.signalQueue.delete(id);
+    for (const msg of queued) {
+      try {
+        sink(msg);
+      } catch {
+        /* drop */
+      }
+    }
+  }
   return () => {
     // Only remove if it's still the same sink (avoid clobbering a reconnect).
     if (store.signalSinks.get(id) === sink) store.signalSinks.delete(id);
   };
 }
 
-/** Deliver a signaling message to its addressee. Returns false if offline. */
+/** Deliver a signaling message, queueing briefly if the peer isn't connected. */
 export function routeSignal(msg: SignalMessage): boolean {
   const sink = store.signalSinks.get(msg.to);
-  if (!sink) return false;
-  try {
-    sink(msg);
-    return true;
-  } catch {
-    return false;
+  if (sink) {
+    try {
+      sink(msg);
+      return true;
+    } catch {
+      /* fall through to queue */
+    }
   }
+  const q = store.signalQueue.get(msg.to) ?? [];
+  q.push(msg);
+  // Bound the backlog so a peer that never connects can't grow memory forever.
+  while (q.length > SIGNAL_QUEUE_MAX) q.shift();
+  store.signalQueue.set(msg.to, q);
+  return false;
 }

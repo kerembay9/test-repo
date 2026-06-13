@@ -75,19 +75,30 @@ export default function HostDashboard() {
   const [hostId] = useState(() => randomId());
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
   const [inputId, setInputId] = useState("");
+  // Local intent to stream, so the host's signaling mailbox opens immediately
+  // instead of waiting for the `live` flag to round-trip through a snapshot.
+  const [streaming, setStreaming] = useState(false);
   const captureRef = useRef<MediaStream | null>(null);
   const broadcasterRef = useRef<HostBroadcaster | null>(null);
   const onSignal = useCallback((msg: SignalMessage) => {
     void broadcasterRef.current?.onSignal(msg);
   }, []);
-  const { send: sendSignal } = useSignaling(hostId, live, onSignal);
+  const { send: sendSignal } = useSignaling(hostId, live || streaming, onSignal);
 
+  // Device labels (e.g. "BlackHole 2ch") are hidden until the page has been
+  // granted audio permission once, so prime it before listing inputs.
   const refreshInputs = useCallback(async () => {
+    try {
+      const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tmp.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* permission denied; labels stay blank but ids still work */
+    }
     try {
       const devs = await navigator.mediaDevices.enumerateDevices();
       setInputs(devs.filter((d) => d.kind === "audioinput"));
     } catch {
-      /* enumeration blocked until a capture grants permission */
+      /* enumeration unavailable */
     }
   }, []);
 
@@ -243,12 +254,13 @@ export default function HostDashboard() {
       }
       captureRef.current = stream;
       broadcasterRef.current = new HostBroadcaster(stream, sendSignal);
+      // Open our signaling mailbox before any answers can come back.
+      setStreaming(true);
       await sendControl({ action: "goLive", hostId });
       // Connect to whoever is already in the room.
       broadcasterRef.current.syncSpeakers(
         (snapshotRef.current?.speakers ?? []).map((s) => s.id),
       );
-      void refreshInputs();
     });
 
   const stopLive = () =>
@@ -257,6 +269,7 @@ export default function HostDashboard() {
       broadcasterRef.current = null;
       captureRef.current?.getTracks().forEach((t) => t.stop());
       captureRef.current = null;
+      setStreaming(false);
       await sendControl({ action: "endLive" });
     });
 
@@ -448,26 +461,39 @@ export default function HostDashboard() {
                 a browser tab&apos;s audio.
               </p>
               <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" disabled={busy} onClick={() => void refreshInputs()}>
+                  Scan devices
+                </Button>
                 <select
                   className="rounded-md border bg-background px-2 py-2 text-sm max-w-[16rem]"
                   value={inputId}
                   onFocus={() => void refreshInputs()}
                   onChange={(e) => setInputId(e.target.value)}
                 >
-                  <option value="">Default input…</option>
+                  <option value="">Default input (usually the mic)…</option>
                   {inputs.map((d) => (
                     <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || "Microphone / input"}
+                      {d.label || "Unlabeled input"}
                     </option>
                   ))}
                 </select>
-                <Button variant="secondary" disabled={busy} onClick={() => void startLive("device")}>
-                  Stream input device
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void startLive("device")}
+                >
+                  Stream selected input
                 </Button>
                 <Button variant="outline" disabled={busy} onClick={() => void startLive("tab")}>
                   Share a tab instead
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Click <span className="text-foreground font-medium">Scan devices</span>{" "}
+                (allow the mic prompt), then pick{" "}
+                <span className="text-foreground font-medium">BlackHole 2ch</span>{" "}
+                — not the default, which captures your microphone.
+              </p>
               <p className="text-xs text-muted-foreground">
                 Live streaming can&apos;t be sample-aligned like files — expect a
                 small, steady lag versus this Mac&apos;s own speakers. Use each
