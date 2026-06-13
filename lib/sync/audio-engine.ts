@@ -40,6 +40,10 @@ export class AudioEngine {
   private role: ChannelRole = "stereo";
   private volume = 1;
   private trimSec = 0;
+  // Channel count of the decoded buffer. A mono track only fills splitter
+  // output 0, so the routing graph must map "right" back onto channel 0 or it
+  // would emit pure silence.
+  private channels = 2;
 
   // Bookkeeping for the currently scheduled source.
   private startCtxTime = 0; // ctx.currentTime at which playback (offset) begins
@@ -75,6 +79,8 @@ export class AudioEngine {
     const res = await fetch(url, { cache: "force-cache" });
     const bytes = await res.arrayBuffer();
     this.buffer = await this.ctx.decodeAudioData(bytes);
+    this.channels = this.buffer.numberOfChannels;
+    this.wireRole(); // re-route now that we know the real channel count
     return this.buffer.duration;
   }
 
@@ -233,7 +239,9 @@ export class AudioEngine {
     }
 
     const L = 0;
-    const R = 1;
+    // Mono buffers only carry signal on splitter output 0; fold "right" onto it
+    // so mono content is audible in every role instead of dropping to silence.
+    const R = this.channels > 1 ? 1 : 0;
     switch (this.role) {
       case "left":
         this.splitter.connect(this.merger, L, 0);

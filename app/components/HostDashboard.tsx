@@ -171,7 +171,10 @@ export default function HostDashboard() {
 
   const play = () =>
     guard(async () => {
+      // Pressing Play is the user gesture browsers require to start audio, so
+      // make the host itself a speaker here if it isn't already on.
       if (hostAudioOn) await engineRef.current?.unlock();
+      else await enableHostAudio();
       await sendControl({ action: "play" });
     });
   const pause = () => guard(() => sendControl({ action: "pause" }));
