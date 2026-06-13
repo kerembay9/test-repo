@@ -75,6 +75,14 @@ export default function HostDashboard() {
   const isPlaying = transport?.isPlaying ?? false;
   const speakers = useMemo(() => snapshot?.speakers ?? [], [snapshot?.speakers]);
   const live = transport?.live ?? false;
+  // Phones report their live-stream latency; delay the Mac to match the slowest
+  // so it isn't ahead of any of them.
+  const measuredLatencies = speakers
+    .map((s) => s.latencyMs)
+    .filter((v): v is number => typeof v === "number" && v > 0);
+  const suggestedDelay = measuredLatencies.length
+    ? Math.round(Math.max(...measuredLatencies))
+    : null;
 
   // Live audio streaming (Spotify / system audio) over WebRTC.
   const [hostId] = useState(() => randomId());
@@ -633,10 +641,30 @@ export default function HostDashboard() {
                         +25
                       </Button>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={suggestedDelay === null}
+                        onClick={() => suggestedDelay !== null && setDelayMs(suggestedDelay)}
+                      >
+                        {suggestedDelay === null
+                          ? "Measuring phones…"
+                          : `Auto-set to measured (${suggestedDelay} ms)`}
+                      </Button>
+                      {measuredLatencies.length > 0 && (
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          phones:{" "}
+                          {measuredLatencies
+                            .map((v) => `${Math.round(v)}ms`)
+                            .join(", ")}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Play something with a steady beat, then step the delay until
-                      this Mac and the phones land on the beat together. Most
-                      Wi-Fi setups settle around 150–400 ms.
+                      Auto-set reads each phone&apos;s WebRTC buffer + network
+                      latency (give it a few seconds to settle), then fine-tune by
+                      ear with ±5. Most Wi-Fi setups land around 150–400 ms.
                     </p>
                   </>
                 )}

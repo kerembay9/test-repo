@@ -17,6 +17,7 @@ interface ControlArgs {
   speakerId?: string;
   speakerName?: string;
   hostId?: string;
+  latencyMs?: number;
 }
 
 export async function sendControl(args: ControlArgs): Promise<Snapshot> {

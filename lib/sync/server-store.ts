@@ -105,12 +105,17 @@ export function registerSpeaker(id: string, name: string): void {
   store.speakers.set(id, { id, name, connected: true, lastSeen: Date.now() });
 }
 
-export function touchSpeaker(id: string, name?: string): void {
+export function touchSpeaker(
+  id: string,
+  name?: string,
+  latencyMs?: number,
+): void {
   const s = store.speakers.get(id);
   if (s) {
     s.lastSeen = Date.now();
     s.connected = true;
     if (name) s.name = name;
+    if (typeof latencyMs === "number") s.latencyMs = latencyMs;
   } else if (name) {
     registerSpeaker(id, name);
   }

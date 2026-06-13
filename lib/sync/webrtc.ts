@@ -148,6 +148,39 @@ export class SpeakerReceiver {
     }
   }
 
+  /**
+   * Estimate how far this speaker lags the source: the receiver's average
+   * jitter-buffer delay (the dominant term) plus one-way network latency. The
+   * caller adds local audio-output latency. Returns ms, or null if not ready.
+   */
+  async measureLatencyMs(): Promise<number | null> {
+    if (!this.peer) return null;
+    const stats = await this.peer.pc.getStats();
+    let jitterDelay = 0;
+    let jitterCount = 0;
+    let rttSec = 0;
+    stats.forEach((r) => {
+      const s = r as unknown as {
+        type: string;
+        kind?: string;
+        jitterBufferDelay?: number;
+        jitterBufferEmittedCount?: number;
+        nominated?: boolean;
+        currentRoundTripTime?: number;
+      };
+      if (s.type === "inbound-rtp" && s.kind === "audio") {
+        jitterDelay = s.jitterBufferDelay ?? 0;
+        jitterCount = s.jitterBufferEmittedCount ?? 0;
+      }
+      if (s.type === "candidate-pair" && s.currentRoundTripTime != null) {
+        rttSec = s.currentRoundTripTime;
+      }
+    });
+    if (jitterCount === 0) return null;
+    const jitterMs = (jitterDelay / jitterCount) * 1000;
+    return jitterMs + (rttSec / 2) * 1000;
+  }
+
   stop(): void {
     this.peer?.close();
     this.peer = null;

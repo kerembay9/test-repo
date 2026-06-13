@@ -33,6 +33,7 @@ interface ControlBody {
   speakerId?: string;
   speakerName?: string;
   hostId?: string;
+  latencyMs?: number;
 }
 
 export async function POST(req: Request) {
@@ -110,8 +111,12 @@ export async function POST(req: Request) {
       break;
     }
     case "heartbeat": {
-      if (body.speakerId) touchSpeaker(body.speakerId, body.speakerName);
-      // Heartbeats don't change transport; avoid a version bump.
+      if (body.speakerId) {
+        touchSpeaker(body.speakerId, body.speakerName, body.latencyMs);
+      }
+      // Heartbeats don't bump the transport version, but a fresh latency report
+      // should reach the host, so push it out when one is included.
+      if (typeof body.latencyMs === "number") broadcast();
       return Response.json(getSnapshot());
     }
     default:

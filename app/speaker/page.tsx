@@ -140,10 +140,23 @@ export default function SpeakerPage() {
     }, 200);
 
     const hb = setInterval(() => {
-      if (deviceId) {
-        void sendControl({ action: "heartbeat", speakerId: deviceId, speakerName: name });
-      }
-    }, 8000);
+      if (!deviceId) return;
+      void (async () => {
+        let latencyMs: number | undefined;
+        const recv = receiverRef.current;
+        const engine = engineRef.current;
+        if (recv && engine) {
+          const net = await recv.measureLatencyMs();
+          if (net != null) latencyMs = Math.round(net + engine.outputLatencyMs());
+        }
+        await sendControl({
+          action: "heartbeat",
+          speakerId: deviceId,
+          speakerName: name,
+          latencyMs,
+        });
+      })();
+    }, 4000);
 
     return () => {
       clearInterval(tick);

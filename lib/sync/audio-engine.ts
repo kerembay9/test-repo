@@ -128,6 +128,15 @@ export class AudioEngine {
     void this.ctx.resume();
   }
 
+  /** Audio output latency of this device, in ms (hardware + buffer). */
+  outputLatencyMs(): number {
+    const ctx = this.ctx as AudioContext & {
+      outputLatency?: number;
+      baseLatency?: number;
+    };
+    return (ctx.outputLatency ?? ctx.baseLatency ?? 0) * 1000;
+  }
+
   detachStream(): void {
     if (this.streamSrc) {
       this.streamSrc.disconnect();

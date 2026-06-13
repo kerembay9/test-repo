@@ -52,6 +52,8 @@ export interface Speaker {
   name: string;
   connected: boolean;
   lastSeen: number;
+  /** Self-reported live-stream latency (ms), used to auto-set the host delay. */
+  latencyMs?: number;
 }
 
 export interface Snapshot {
