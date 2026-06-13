@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
@@ -9,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Zeroconf from "react-native-zeroconf";
 import {
   SafeAreaProvider,
   SafeAreaView,
@@ -62,6 +64,15 @@ const F = {
 
 const HOST_KEY = "surround.hostUrl";
 const NAME_KEY = "surround.deviceName";
+
+type Discovered = { name: string; url: string };
+
+/** Build a reachable URL from a resolved Bonjour service (first IPv4 + port). */
+function serviceUrl(s: { addresses?: string[]; port?: number }): string | null {
+  const ip = (s.addresses ?? []).find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a));
+  if (!ip || !s.port) return null;
+  return `http://${ip}:${s.port}`;
+}
 
 function normalizeHost(raw: string): string | null {
   let v = raw.trim();
@@ -211,6 +222,8 @@ function AppInner() {
   const [connected, setConnected] = useState(false);
   const [focus, setFocus] = useState<"host" | "name" | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [discovered, setDiscovered] = useState<Discovered[]>([]);
+  const [searching, setSearching] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const webRef = useRef<WebView>(null);
 
@@ -252,6 +265,37 @@ function AppInner() {
     setHost(null);
     setConnected(false);
   }, []);
+
+  // Auto-discover hosts on the LAN via mDNS while on the onboarding screen.
+  useEffect(() => {
+    if (!ready || host) return;
+    let zc: Zeroconf | null = null;
+    try {
+      zc = new Zeroconf();
+      zc.on("resolved", (s: { name?: string; addresses?: string[]; port?: number }) => {
+        const url = serviceUrl(s);
+        if (!url) return;
+        setDiscovered((prev) =>
+          prev.some((d) => d.url === url)
+            ? prev
+            : [...prev, { name: s.name ?? "Surround host", url }],
+        );
+      });
+      zc.on("error", () => setSearching(false));
+      zc.scan("surround", "tcp", "local.");
+      setSearching(true);
+    } catch {
+      setSearching(false);
+    }
+    return () => {
+      try {
+        zc?.stop();
+        zc?.removeDeviceListeners?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [ready, host]);
 
   const onScan = useCallback(({ data }: { data: string }) => {
     setScanning(false);
@@ -315,6 +359,38 @@ function AppInner() {
             </Text>
 
             <View style={styles.form}>
+              {discovered.length > 0 ? (
+                <View style={styles.found}>
+                  <Text style={styles.label}>Found nearby</Text>
+                  {discovered.map((d) => (
+                    <Pressable
+                      key={d.url}
+                      style={({ pressed }) => [styles.foundRow, pressed && styles.foundRowPressed]}
+                      onPress={() => void connect(d.url, name)}
+                    >
+                      <View style={styles.foundDot} />
+                      <View style={styles.flex1}>
+                        <Text style={styles.foundName} numberOfLines={1}>
+                          {d.name}
+                        </Text>
+                        <Text style={styles.foundUrl} numberOfLines={1}>
+                          {d.url.replace(/^https?:\/\//, "")}
+                        </Text>
+                      </View>
+                      <Text style={styles.foundJoin}>Join</Text>
+                    </Pressable>
+                  ))}
+                  <Text style={styles.orLabel}>or enter it manually</Text>
+                </View>
+              ) : (
+                searching && (
+                  <View style={styles.searching}>
+                    <ActivityIndicator size="small" color={C.signal} />
+                    <Text style={styles.searchingText}>Searching for hosts nearby…</Text>
+                  </View>
+                )
+              )}
+
               <Text style={styles.label}>Host address</Text>
               <TextInput
                 style={[styles.input, focus === "host" && styles.inputFocus]}
@@ -470,6 +546,28 @@ const styles = StyleSheet.create({
     marginBottom: 26,
   },
   form: { gap: 0 },
+  flex1: { flex: 1 },
+  found: { marginBottom: 18 },
+  foundRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.raise,
+    borderWidth: 1,
+    borderColor: C.signal,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 8,
+  },
+  foundRowPressed: { opacity: 0.85 },
+  foundDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.live },
+  foundName: { fontFamily: F.semibold, color: C.ink, fontSize: 15 },
+  foundUrl: { fontFamily: F.regular, color: C.inkSoft, fontSize: 12 },
+  foundJoin: { fontFamily: F.bold, color: C.signal, fontSize: 14 },
+  orLabel: { fontFamily: F.regular, color: C.inkSoft, fontSize: 12, marginTop: 4, marginBottom: 4 },
+  searching: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 },
+  searchingText: { fontFamily: F.medium, color: C.inkSoft, fontSize: 13 },
   label: {
     fontFamily: F.semibold,
     color: C.inkSoft,
