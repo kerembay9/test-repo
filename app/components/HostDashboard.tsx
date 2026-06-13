@@ -155,6 +155,21 @@ export default function HostDashboard() {
   }, [live, speakers]);
 
   useEffect(() => {
+    // Advertise this host over mDNS so the mobile app can auto-discover it.
+    // The browser knows the real port; the server only learns it from us.
+    const port =
+      Number(window.location.port) ||
+      (window.location.protocol === "https:" ? 443 : 80);
+    void fetch("/api/advertise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ port }),
+    }).catch(() => {
+      /* discovery is a convenience; manual entry / QR still work */
+    });
+  }, []);
+
+  useEffect(() => {
     // Build a join URL phones can reach: the LAN IP from the server, not the
     // localhost the host page is served on. Fall back to the page origin.
     const fallback = `${window.location.origin}/speaker`;
