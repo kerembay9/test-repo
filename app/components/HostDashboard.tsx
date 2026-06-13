@@ -81,6 +81,9 @@ export default function HostDashboard() {
   // output can be delayed to line up with the WebRTC-lagged phones.
   const [monitorOn, setMonitorOn] = useState(false);
   const [hostTrimMs, setHostTrimMs] = useState(0);
+  // Label of the input we're actually capturing, so it's obvious whether it's
+  // BlackHole or (by mistake) the microphone.
+  const [capturedLabel, setCapturedLabel] = useState("");
   // Local intent to stream, so the host's signaling mailbox opens immediately
   // instead of waiting for the `live` flag to round-trip through a snapshot.
   const [streaming, setStreaming] = useState(false);
@@ -281,6 +284,7 @@ export default function HostDashboard() {
         throw new Error("That source has no audio track to stream.");
       }
       captureRef.current = stream;
+      setCapturedLabel(stream.getAudioTracks()[0]?.label || "unknown input");
       broadcasterRef.current = new HostBroadcaster(stream, sendSignal);
       // Open our signaling mailbox before any answers can come back.
       setStreaming(true);
@@ -504,14 +508,24 @@ export default function HostDashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm">
-                  <span className="text-red-500">●</span> Streaming this
-                  Mac&apos;s audio to {speakers.length} speaker
+                  <span className="text-red-500">●</span> Streaming{" "}
+                  <span className="font-medium">{capturedLabel || "audio"}</span>{" "}
+                  to {speakers.length} speaker
                   {speakers.length === 1 ? "" : "s"}.
                 </span>
                 <Button variant="outline" disabled={busy} onClick={() => void stopLive()}>
                   Stop streaming
                 </Button>
               </div>
+              {/(microphone|default|built-in|macbook.*microphone)/i.test(
+                capturedLabel,
+              ) && (
+                <p className="text-xs text-destructive">
+                  That looks like a microphone, not BlackHole — phones will hear
+                  the room, not Spotify. Stop, then pick{" "}
+                  <span className="font-medium">BlackHole 2ch</span> as the input.
+                </p>
+              )}
 
               <div className="rounded-md border p-3 space-y-3">
                 <p className="text-sm font-medium">Delay this Mac to match phones</p>
