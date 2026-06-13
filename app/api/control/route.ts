@@ -19,11 +19,20 @@ export const runtime = "nodejs";
 const LEAD_MS = 600;
 
 interface ControlBody {
-  action: "setTrack" | "play" | "pause" | "seek" | "stop" | "heartbeat";
+  action:
+    | "setTrack"
+    | "play"
+    | "pause"
+    | "seek"
+    | "stop"
+    | "heartbeat"
+    | "goLive"
+    | "endLive";
   track?: TrackInfo;
   positionSec?: number;
   speakerId?: string;
   speakerName?: string;
+  hostId?: string;
 }
 
 export async function POST(req: Request) {
@@ -80,6 +89,24 @@ export async function POST(req: Request) {
     }
     case "stop": {
       setTransport({ isPlaying: false, positionSec: 0, anchorServerTime: now });
+      break;
+    }
+    case "goLive": {
+      if (!body.hostId) {
+        return Response.json({ error: "hostId required" }, { status: 400 });
+      }
+      // Live capture replaces file playback; stop the file transport so
+      // speakers don't try to play both at once.
+      setTransport({
+        live: true,
+        hostId: body.hostId,
+        isPlaying: false,
+        anchorServerTime: now,
+      });
+      break;
+    }
+    case "endLive": {
+      setTransport({ live: false, hostId: null, anchorServerTime: now });
       break;
     }
     case "heartbeat": {

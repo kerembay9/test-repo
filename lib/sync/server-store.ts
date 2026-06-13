@@ -6,9 +6,10 @@
 // right and keeps the whole app dependency-free. It is stashed on globalThis so
 // it survives Next.js hot-reloads in development.
 
-import type { Snapshot, Speaker, Transport } from "./types";
+import type { SignalMessage, Snapshot, Speaker, Transport } from "./types";
 
 type Subscriber = (snap: Snapshot) => void;
+type SignalSink = (msg: SignalMessage) => void;
 
 interface StoredTrack {
   name: string;
@@ -21,6 +22,8 @@ interface Store {
   speakers: Map<string, Speaker>;
   tracks: Map<string, StoredTrack>;
   subscribers: Set<Subscriber>;
+  /** WebRTC signaling mailboxes, keyed by peer id. */
+  signalSinks: Map<string, SignalSink>;
   version: number;
 }
 
@@ -34,16 +37,25 @@ function createStore(): Store {
       isPlaying: false,
       positionSec: 0,
       anchorServerTime: Date.now(),
+      live: false,
+      hostId: null,
     },
     speakers: new Map(),
     tracks: new Map(),
     subscribers: new Set(),
+    signalSinks: new Map(),
     version: 0,
   };
 }
 
 const g = globalThis as unknown as { __surroundStore?: Store };
 const store: Store = g.__surroundStore ?? (g.__surroundStore = createStore());
+
+// Retrofit fields onto a store that was created (and cached on globalThis) by an
+// older build before a hot-reload, so newly added state isn't left undefined.
+store.signalSinks ??= new Map();
+store.transport.live ??= false;
+store.transport.hostId ??= null;
 
 export function getSnapshot(): Snapshot {
   pruneStale();
@@ -124,4 +136,26 @@ export function addTrack(track: StoredTrack): string {
 
 export function getTrack(id: string): StoredTrack | undefined {
   return store.tracks.get(id);
+}
+
+// --- WebRTC signaling relay -------------------------------------------------
+
+export function addSignalSink(id: string, sink: SignalSink): () => void {
+  store.signalSinks.set(id, sink);
+  return () => {
+    // Only remove if it's still the same sink (avoid clobbering a reconnect).
+    if (store.signalSinks.get(id) === sink) store.signalSinks.delete(id);
+  };
+}
+
+/** Deliver a signaling message to its addressee. Returns false if offline. */
+export function routeSignal(msg: SignalMessage): boolean {
+  const sink = store.signalSinks.get(msg.to);
+  if (!sink) return false;
+  try {
+    sink(msg);
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { AudioEngine, type EngineStatus } from "@/lib/sync/audio-engine";
 import { sendControl } from "@/lib/sync/client";
+import { randomId } from "@/lib/sync/id";
 import { useSession } from "@/lib/sync/useSession";
-import type { ChannelRole } from "@/lib/sync/types";
+import { useSignaling } from "@/lib/sync/useSignaling";
+import { SpeakerReceiver } from "@/lib/sync/webrtc";
+import type { ChannelRole, SignalMessage } from "@/lib/sync/types";
 
 const ROLES: { value: ChannelRole; label: string; hint: string }[] = [
   { value: "stereo", label: "Stereo", hint: "Full left + right" },
@@ -22,22 +25,6 @@ function getDeviceId(): string {
     localStorage.setItem("surround.deviceId", id);
   }
   return id;
-}
-
-// crypto.randomUUID only exists in secure contexts (HTTPS / localhost).
-// Speakers join over plain-HTTP LAN IPs, so fall back to a manual UUIDv4.
-function randomId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
-  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
-    .slice(6, 8)
-    .join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
 }
 
 function defaultName(): string {
@@ -76,6 +63,19 @@ export default function SpeakerPage() {
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  // Live (WebRTC) streaming from the host.
+  const live = snapshot?.transport.live ?? false;
+  const hostId = snapshot?.transport.hostId ?? null;
+  const receiverRef = useRef<SpeakerReceiver | null>(null);
+  const onSignal = useCallback((msg: SignalMessage) => {
+    void receiverRef.current?.onSignal(msg);
+  }, []);
+  const { send: sendSignal } = useSignaling(
+    deviceId || null,
+    joined && live,
+    onSignal,
+  );
 
   // Join requires a user gesture so the browser lets us produce audio.
   const join = useCallback(async () => {
@@ -126,7 +126,14 @@ export default function SpeakerPage() {
     const tick = setInterval(() => {
       const engine = engineRef.current;
       const snap = snapshotRef.current;
-      if (engine && snap && clock.isSynced && loadedUrlRef.current) {
+      // File reconciliation only; live streaming drives the engine separately.
+      if (
+        engine &&
+        snap &&
+        !snap.transport.live &&
+        clock.isSynced &&
+        loadedUrlRef.current
+      ) {
         engine.apply(snap.transport, clock);
         setStatus(engine.status());
       }
@@ -147,10 +154,37 @@ export default function SpeakerPage() {
   // Apply immediately on each new snapshot too (don't wait for the next tick).
   useEffect(() => {
     const engine = engineRef.current;
-    if (joined && engine && snapshot && clock.isSynced && loadedUrlRef.current) {
+    if (
+      joined &&
+      engine &&
+      snapshot &&
+      !snapshot.transport.live &&
+      clock.isSynced &&
+      loadedUrlRef.current
+    ) {
       engine.apply(snapshot.transport, clock);
     }
   }, [snapshot, joined, clock]);
+
+  // Live mode: receive the host's WebRTC stream and route it through the engine.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!joined || !live || !hostId || !deviceId || !engine) {
+      receiverRef.current?.stop();
+      receiverRef.current = null;
+      engine?.detachStream();
+      return;
+    }
+    const recv = new SpeakerReceiver(hostId, sendSignal, (stream) =>
+      engine.attachStream(stream),
+    );
+    receiverRef.current = recv;
+    return () => {
+      recv.stop();
+      receiverRef.current = null;
+      engine.detachStream();
+    };
+  }, [joined, live, hostId, deviceId, sendSignal]);
 
   useEffect(() => {
     return () => engineRef.current?.destroy();
@@ -196,7 +230,9 @@ export default function SpeakerPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-bold">{name}</h1>
         <p className="text-sm text-muted-foreground">
-          {track ? (
+          {live ? (
+            <>🔴 Live from host</>
+          ) : track ? (
             <>
               {isPlaying ? "▶ Playing" : "⏸ Paused"} · {track.name}
             </>

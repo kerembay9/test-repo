@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import {
   Card,
@@ -10,8 +10,15 @@ import {
 } from "@/app/components/ui/card";
 import { AudioEngine } from "@/lib/sync/audio-engine";
 import { sendControl, uploadTrack } from "@/lib/sync/client";
+import { randomId } from "@/lib/sync/id";
 import { useSession } from "@/lib/sync/useSession";
-import { positionAt, type TrackInfo } from "@/lib/sync/types";
+import { useSignaling } from "@/lib/sync/useSignaling";
+import { HostBroadcaster } from "@/lib/sync/webrtc";
+import {
+  positionAt,
+  type SignalMessage,
+  type TrackInfo,
+} from "@/lib/sync/types";
 
 const BUNDLED_TRACK: TrackInfo = {
   id: "bundled-testsound",
@@ -61,7 +68,35 @@ export default function HostDashboard() {
   const transport = snapshot?.transport;
   const track = transport?.track ?? null;
   const isPlaying = transport?.isPlaying ?? false;
-  const speakers = snapshot?.speakers ?? [];
+  const speakers = useMemo(() => snapshot?.speakers ?? [], [snapshot?.speakers]);
+  const live = transport?.live ?? false;
+
+  // Live audio streaming (Spotify / system audio) over WebRTC.
+  const [hostId] = useState(() => randomId());
+  const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
+  const [inputId, setInputId] = useState("");
+  const captureRef = useRef<MediaStream | null>(null);
+  const broadcasterRef = useRef<HostBroadcaster | null>(null);
+  const onSignal = useCallback((msg: SignalMessage) => {
+    void broadcasterRef.current?.onSignal(msg);
+  }, []);
+  const { send: sendSignal } = useSignaling(hostId, live, onSignal);
+
+  const refreshInputs = useCallback(async () => {
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setInputs(devs.filter((d) => d.kind === "audioinput"));
+    } catch {
+      /* enumeration blocked until a capture grants permission */
+    }
+  }, []);
+
+  // Keep WebRTC peers in step with the connected speaker list while live.
+  useEffect(() => {
+    if (live && broadcasterRef.current) {
+      broadcasterRef.current.syncSpeakers(speakers.map((s) => s.id));
+    }
+  }, [live, speakers]);
 
   useEffect(() => {
     setJoinUrl(`${window.location.origin}/speaker`);
@@ -180,6 +215,58 @@ export default function HostDashboard() {
   const pause = () => guard(() => sendControl({ action: "pause" }));
   const stop = () => guard(() => sendControl({ action: "stop" }));
   const seek = (pos: number) => guard(() => sendControl({ action: "seek", positionSec: pos }));
+
+  const startLive = (mode: "device" | "tab") =>
+    guard(async () => {
+      let stream: MediaStream;
+      if (mode === "tab") {
+        // Share a tab/window and tick "share audio". Video is discarded.
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+        });
+        stream.getVideoTracks().forEach((t) => t.stop());
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: inputId ? { exact: inputId } : undefined,
+            // Capture the program audio as-is, not voice.
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+      }
+      if (stream.getAudioTracks().length === 0) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new Error("That source has no audio track to stream.");
+      }
+      captureRef.current = stream;
+      broadcasterRef.current = new HostBroadcaster(stream, sendSignal);
+      await sendControl({ action: "goLive", hostId });
+      // Connect to whoever is already in the room.
+      broadcasterRef.current.syncSpeakers(
+        (snapshotRef.current?.speakers ?? []).map((s) => s.id),
+      );
+      void refreshInputs();
+    });
+
+  const stopLive = () =>
+    guard(async () => {
+      broadcasterRef.current?.stop();
+      broadcasterRef.current = null;
+      captureRef.current?.getTracks().forEach((t) => t.stop());
+      captureRef.current = null;
+      await sendControl({ action: "endLive" });
+    });
+
+  // Tear streaming down if the host page unmounts.
+  useEffect(() => {
+    return () => {
+      broadcasterRef.current?.stop();
+      captureRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   const copyJoin = async () => {
     try {
@@ -330,6 +417,64 @@ export default function HostDashboard() {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            2½ · Stream live audio (Spotify / system)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {live ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm">
+                <span className="text-red-500">●</span> Streaming this Mac&apos;s
+                audio to {speakers.length} speaker
+                {speakers.length === 1 ? "" : "s"}.
+              </span>
+              <Button variant="outline" disabled={busy} onClick={() => void stopLive()}>
+                Stop streaming
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Send whatever is playing on this Mac (e.g. Spotify) to the
+                phones. Pick a loopback input like{" "}
+                <span className="text-foreground font-medium">BlackHole</span>{" "}
+                (route Spotify into it via a macOS Multi-Output Device), or share
+                a browser tab&apos;s audio.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="rounded-md border bg-background px-2 py-2 text-sm max-w-[16rem]"
+                  value={inputId}
+                  onFocus={() => void refreshInputs()}
+                  onChange={(e) => setInputId(e.target.value)}
+                >
+                  <option value="">Default input…</option>
+                  {inputs.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || "Microphone / input"}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="secondary" disabled={busy} onClick={() => void startLive("device")}>
+                  Stream input device
+                </Button>
+                <Button variant="outline" disabled={busy} onClick={() => void startLive("tab")}>
+                  Share a tab instead
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Live streaming can&apos;t be sample-aligned like files — expect a
+                small, steady lag versus this Mac&apos;s own speakers. Use each
+                phone&apos;s delay trim to line them up.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
 

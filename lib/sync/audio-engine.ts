@@ -30,6 +30,11 @@ export class AudioEngine {
   private ctx: AudioContext;
   private buffer: AudioBuffer | null = null;
   private source: AudioBufferSourceNode | null = null;
+  // Live (WebRTC) source, used instead of a decoded buffer in live mode.
+  private streamSrc: MediaStreamAudioSourceNode | null = null;
+  // Muted keep-alive element: Chrome won't pull a remote WebRTC stream through
+  // Web Audio alone, so an attached HTMLMediaElement is needed to flow the track.
+  private sinkEl: HTMLAudioElement | null = null;
 
   // Static routing graph: source -> splitter -> merger -> delay -> gain -> out
   private splitter: ChannelSplitterNode;
@@ -82,6 +87,39 @@ export class AudioEngine {
     this.channels = this.buffer.numberOfChannels;
     this.wireRole(); // re-route now that we know the real channel count
     return this.buffer.duration;
+  }
+
+  /**
+   * Play a live MediaStream (WebRTC) through the same role/volume/delay graph
+   * used for files. Replaces any current source. Used in live streaming mode.
+   */
+  attachStream(stream: MediaStream): void {
+    this.detachStream();
+    this.stopSource(); // never run the file source and a live stream together
+
+    const sink = new Audio();
+    sink.muted = true; // routed through Web Audio; the element only flows bytes
+    sink.srcObject = stream;
+    void sink.play().catch(() => {});
+    this.sinkEl = sink;
+
+    this.streamSrc = this.ctx.createMediaStreamSource(stream);
+    this.channels = 2; // remote opus audio is delivered as stereo
+    this.wireRole();
+    this.streamSrc.connect(this.splitter);
+    void this.ctx.resume();
+  }
+
+  detachStream(): void {
+    if (this.streamSrc) {
+      this.streamSrc.disconnect();
+      this.streamSrc = null;
+    }
+    if (this.sinkEl) {
+      this.sinkEl.pause();
+      this.sinkEl.srcObject = null;
+      this.sinkEl = null;
+    }
   }
 
   setRole(role: ChannelRole): void {
@@ -144,6 +182,7 @@ export class AudioEngine {
 
   destroy(): void {
     this.stopSource();
+    this.detachStream();
     void this.ctx.close();
   }
 

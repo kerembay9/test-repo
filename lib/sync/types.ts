@@ -30,6 +30,21 @@ export interface Transport {
   positionSec: number;
   /** Server epoch (ms) that `positionSec` refers to. */
   anchorServerTime: number;
+  /** True while the host is streaming live captured audio over WebRTC. */
+  live: boolean;
+  /** Peer id of the host while live, so speakers know whom to answer. */
+  hostId: string | null;
+}
+
+/** WebRTC signaling message relayed between peers via /api/signal. */
+export type SignalType = "offer" | "answer" | "ice";
+
+export interface SignalMessage {
+  from: string;
+  to: string;
+  type: SignalType;
+  /** SDP string for offer/answer, or a serialized ICE candidate. */
+  data: unknown;
 }
 
 export interface Speaker {
