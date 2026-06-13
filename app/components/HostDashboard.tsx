@@ -353,6 +353,10 @@ export default function HostDashboard() {
     setMonitorOn(false);
   };
 
+  const setDelayMs = (ms: number) =>
+    setHostTrimMs(Math.min(1000, Math.max(0, Math.round(ms || 0))));
+  const nudgeDelay = (by: number) => setDelayMs(hostTrimMs + by);
+
   // Live host-delay slider takes effect immediately.
   useEffect(() => {
     if (monitorOn) engineRef.current?.setTrimMs(hostTrimMs);
@@ -589,10 +593,7 @@ export default function HostDashboard() {
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <label className="text-sm flex-1 flex justify-between pr-3">
-                        <span>Delay</span>
-                        <span className="tabular-nums">{hostTrimMs} ms</span>
-                      </label>
+                      <span className="text-sm">Delay this Mac</span>
                       <Button size="sm" variant="ghost" onClick={disableMonitor}>
                         Turn off
                       </Button>
@@ -606,8 +607,36 @@ export default function HostDashboard() {
                       onChange={(e) => setHostTrimMs(Number(e.target.value))}
                       className="w-full"
                     />
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(-25)}>
+                        −25
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(-5)}>
+                        −5
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={1000}
+                          step={5}
+                          value={hostTrimMs}
+                          onChange={(e) => setDelayMs(Number(e.target.value))}
+                          className="w-20 rounded-md border bg-background px-2 py-1 text-sm text-right tabular-nums"
+                        />
+                        <span className="text-sm text-muted-foreground">ms</span>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(5)}>
+                        +5
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(25)}>
+                        +25
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Nudge up until this Mac lines up with the phones by ear.
+                      Play something with a steady beat, then step the delay until
+                      this Mac and the phones land on the beat together. Most
+                      Wi-Fi setups settle around 150–400 ms.
                     </p>
                   </>
                 )}
