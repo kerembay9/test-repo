@@ -18,6 +18,9 @@ asar: true
 
 mac:
   category: public.app-category.music
+  # Version-less names so the landing page's
+  # releases/latest/download/<file> links stay stable across versions.
+  artifactName: ${productName}-mac-${arch}.${ext}
   target:
     - target: dmg
       arch: [arm64, x64]
@@ -37,6 +40,7 @@ mac:
 afterSign: electron/build-resources/notarize.js
 
 win:
+  artifactName: ${productName}-windows-${arch}.${ext}
   target:
     - target: nsis
       arch: [x64]

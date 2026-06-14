@@ -39,6 +39,16 @@ const SYNC = [
 
 const ROLES = ["Stereo", "Left", "Right", "Mono"];
 
+// Desktop host installers, served as GitHub Release assets. The artifact names
+// are version-less (see electron-builder.yml), so "latest/download" stays valid
+// across releases.
+const RELEASES = "https://github.com/kerembay9/test-repo/releases/latest/download";
+const DOWNLOADS = [
+  { label: "macOS — Apple Silicon", file: "Surround-mac-arm64.dmg", primary: true },
+  { label: "macOS — Intel", file: "Surround-mac-x64.dmg", primary: false },
+  { label: "Windows", file: "Surround-windows-x64.exe", primary: false },
+];
+
 function SoundField() {
   return (
     <div
@@ -158,7 +168,35 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Get the app */}
+      {/* Get the desktop host app */}
+      <section className="mx-auto max-w-3xl px-6 py-20 text-center">
+        <h2 className="text-2xl font-semibold text-foreground">
+          Run the host on your computer
+        </h2>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+          The host plays the music and keeps every phone in sync. Download the
+          desktop app for macOS or Windows — no terminal, no setup.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {DOWNLOADS.map((d) => (
+            <Button
+              key={d.file}
+              asChild
+              size="lg"
+              variant={d.primary ? "default" : "outline"}
+              className="px-7 text-base"
+            >
+              <a href={`${RELEASES}/${d.file}`}>{d.label}</a>
+            </Button>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          macOS 10.12+ · Windows 10+. The app runs the host server locally;
+          phones join from the same Wi-Fi.
+        </p>
+      </section>
+
+      {/* Get the speaker app */}
       <section className="mx-auto max-w-3xl px-6 py-20 text-center">
         <h2 className="text-2xl font-semibold text-foreground">Get the speaker app</h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
