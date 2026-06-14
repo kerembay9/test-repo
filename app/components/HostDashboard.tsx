@@ -33,9 +33,6 @@ type SurroundBridge = {
   audioSetOutput?: (name: string) => Promise<string>;
 };
 const BLACKHOLE_URL = "https://existential.audio/blackhole/";
-// Where the "Buy" button sends the host to purchase a Pro license. Swap for the
-// real horizon-pay checkout once the payment→key-delivery flow is wired.
-const BUY_URL = "https://pay.horizonzeta.com/surround-pro";
 const surroundApi: SurroundBridge | undefined =
   typeof window !== "undefined"
     ? (window as unknown as { surround?: SurroundBridge }).surround
@@ -1101,11 +1098,13 @@ export default function HostDashboard() {
                   </p>
                   <Button
                     size="sm"
-                    onClick={() =>
-                      surroundApi?.openExternal
-                        ? surroundApi.openExternal(BUY_URL)
-                        : window.open(BUY_URL, "_blank")
-                    }
+                    onClick={() => {
+                      // Same-origin endpoint creates a session and redirects to
+                      // the PayTR checkout; opens in the system browser.
+                      const url = `${window.location.origin}/api/buy`;
+                      if (surroundApi?.openExternal) surroundApi.openExternal(url);
+                      else window.open(url, "_blank");
+                    }}
                   >
                     Buy — 500 TL
                   </Button>
