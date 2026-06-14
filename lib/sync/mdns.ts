@@ -16,8 +16,10 @@ const g = globalThis as unknown as { __surroundMdns?: MdnsState };
 const state: MdnsState =
   g.__surroundMdns ?? (g.__surroundMdns = { bonjour: null, service: null, port: null });
 
-export function advertise(port: number): void {
-  if (state.port === port && state.service) return; // already advertising this
+export function advertise(port: number, force = false): void {
+  // `force` re-publishes even on the same port — used by the host's "Refresh
+  // network" button so mDNS re-binds after the machine changes Wi-Fi.
+  if (!force && state.port === port && state.service) return;
   stopAdvertising();
   const name = `Surround on ${hostname().replace(/\.local$/, "")}`;
   state.bonjour = new Bonjour();

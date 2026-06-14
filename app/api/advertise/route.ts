@@ -8,8 +8,9 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   let port: number;
+  let force = false;
   try {
-    ({ port } = (await req.json()) as { port: number });
+    ({ port, force = false } = (await req.json()) as { port: number; force?: boolean });
   } catch {
     return Response.json({ error: "invalid JSON" }, { status: 400 });
   }
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "valid port required" }, { status: 400 });
   }
   try {
-    advertise(p);
+    advertise(p, force);
   } catch (e) {
     return Response.json(
       { error: e instanceof Error ? e.message : "advertise failed" },

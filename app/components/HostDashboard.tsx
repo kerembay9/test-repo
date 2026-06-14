@@ -71,6 +71,7 @@ export default function HostDashboard() {
   const [displayPos, setDisplayPos] = useState(0);
   const [scrubbing, setScrubbing] = useState<number | null>(null);
   const [joinUrl, setJoinUrl] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // The host machine also plays the audio, so it's the main stereo pair.
@@ -174,38 +175,37 @@ export default function HostDashboard() {
     }
   }, [live, speakers]);
 
-  useEffect(() => {
-    // Advertise this host over mDNS so the mobile app can auto-discover it.
-    // The browser knows the real port; the server only learns it from us.
+  // Re-detect the LAN IP (for the QR/join URL) and re-advertise over mDNS.
+  // Runs on mount and from the "Refresh network" button after a Wi-Fi change —
+  // `force` re-binds mDNS to the new interface even on the same port.
+  const refreshNetwork = useCallback(async (force = false) => {
     const port =
       Number(window.location.port) ||
       (window.location.protocol === "https:" ? 443 : 80);
+    // mDNS re-advertise (discovery is a convenience; QR/manual entry still work).
     void fetch("/api/advertise", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ port }),
-    }).catch(() => {
-      /* discovery is a convenience; manual entry / QR still work */
-    });
+      body: JSON.stringify({ port, force }),
+    }).catch(() => {});
+    // Build a join URL phones can reach: the server's LAN IP, not the localhost
+    // the host page is served on. Fall back to the page origin.
+    const fallback = `${window.location.origin}/speaker`;
+    try {
+      const { addresses } = (await (await fetch("/api/host-info")).json()) as {
+        addresses: string[];
+      };
+      const ip = addresses?.[0];
+      const p = window.location.port ? `:${window.location.port}` : "";
+      setJoinUrl(ip ? `${window.location.protocol}//${ip}${p}/speaker` : fallback);
+    } catch {
+      setJoinUrl((prev) => prev || fallback);
+    }
   }, []);
 
   useEffect(() => {
-    // Build a join URL phones can reach: the LAN IP from the server, not the
-    // localhost the host page is served on. Fall back to the page origin.
-    const fallback = `${window.location.origin}/speaker`;
-    setJoinUrl(fallback);
-    void fetch("/api/host-info")
-      .then((r) => r.json() as Promise<{ addresses: string[] }>)
-      .then(({ addresses }) => {
-        const ip = addresses?.[0];
-        if (!ip) return;
-        const port = window.location.port ? `:${window.location.port}` : "";
-        setJoinUrl(`${window.location.protocol}//${ip}${port}/speaker`);
-      })
-      .catch(() => {
-        /* keep fallback */
-      });
-  }, []);
+    void refreshNetwork(false);
+  }, [refreshNetwork]);
 
   // Keep the scrub bar moving while playing.
   useEffect(() => {
@@ -876,7 +876,24 @@ export default function HostDashboard() {
             <Button variant="outline" onClick={() => void copyJoin()}>
               {copied ? "Copied" : "Copy"}
             </Button>
+            <Button
+              variant="outline"
+              disabled={refreshing}
+              onClick={() => {
+                setRefreshing(true);
+                void refreshNetwork(true).finally(() =>
+                  setTimeout(() => setRefreshing(false), 600),
+                );
+              }}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Changed Wi-Fi or hotspot? Tap{" "}
+            <span className="text-foreground font-medium">Refresh</span> to update
+            this address and re-announce the host on the new network.
+          </p>
           <div>
             <p className="text-sm font-medium mb-1">
               Connected speakers ({speakers.length})
