@@ -64,6 +64,14 @@ const F = {
 
 const HOST_KEY = "surround.hostUrl";
 const NAME_KEY = "surround.deviceName";
+const AUTH_KEY = "surround.authed";
+
+// Tester/demo sign-in. There is no auth backend yet (real auth will be Google
+// sign-in), so this is a client-side check: only the tester account is accepted.
+// NOTE: these credentials ship inside the app bundle — they are a known demo
+// login for review/testing, not a secret, and the gate is not real security.
+const TESTER_EMAIL = "tester@surroundspeaker.com";
+const TESTER_PASSWORD = "123+test456";
 
 type Discovered = { name: string; url: string };
 
@@ -220,7 +228,13 @@ function AppInner() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [focus, setFocus] = useState<"host" | "name" | null>(null);
+  const [focus, setFocus] = useState<"host" | "name" | "email" | "password" | null>(null);
+  // Auth gate (client-side tester login; persistent across launches).
+  const [authed, setAuthed] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [discovered, setDiscovered] = useState<Discovered[]>([]);
   const [searching, setSearching] = useState(false);
@@ -232,15 +246,17 @@ function AppInner() {
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
     void (async () => {
-      const [h, n] = await Promise.all([
+      const [h, n, a] = await Promise.all([
         AsyncStorage.getItem(HOST_KEY),
         AsyncStorage.getItem(NAME_KEY),
+        AsyncStorage.getItem(AUTH_KEY),
       ]);
       if (h) {
         setHost(h);
         setHostInput(h);
       }
       setName(n ?? "My phone");
+      setAuthed(a === "1"); // persistent login
       setReady(true);
     })();
   }, []);
@@ -264,6 +280,30 @@ function AppInner() {
   const disconnect = useCallback(async () => {
     setHost(null);
     setConnected(false);
+  }, []);
+
+  const signIn = useCallback(async () => {
+    if (
+      email.trim().toLowerCase() === TESTER_EMAIL &&
+      password === TESTER_PASSWORD
+    ) {
+      setAuthError(null);
+      setPassword("");
+      setAuthed(true);
+      // Persist only if "keep me signed in" is on; otherwise this session only.
+      if (remember) await AsyncStorage.setItem(AUTH_KEY, "1");
+      else await AsyncStorage.removeItem(AUTH_KEY);
+    } else {
+      setAuthError("Incorrect email or password.");
+    }
+  }, [email, password, remember]);
+
+  const signOut = useCallback(async () => {
+    await AsyncStorage.removeItem(AUTH_KEY);
+    setHost(null);
+    setConnected(false);
+    setPassword("");
+    setAuthed(false);
   }, []);
 
   // Auto-discover hosts on the LAN via mDNS while on the onboarding screen.
@@ -306,6 +346,86 @@ function AppInner() {
 
   if (!fontsLoaded || !ready) {
     return <View style={[styles.fill, { backgroundColor: C.field }]} />;
+  }
+
+  // Sign-in gate. Persistent: once signed in (with "keep me signed in"), this is
+  // skipped on later launches until the user signs out.
+  if (!authed) {
+    return (
+      <View style={styles.fill}>
+        <StatusBar style="light" />
+        <LinearGradient colors={[C.fieldTop, C.field]} style={StyleSheet.absoluteFill} />
+        <View style={styles.fieldBackdrop} pointerEvents="none">
+          <SoundField color={C.signal} reduceMotion={reduceMotion} />
+        </View>
+        <SafeAreaView style={styles.fill}>
+          <View style={styles.onboard}>
+            <View style={styles.wordmark}>
+              <Text style={styles.wmTop}>SURROUND</Text>
+              <Text style={styles.wmBottom}>SPEAKER</Text>
+            </View>
+            <Text style={styles.lede}>Sign in to continue.</Text>
+
+            <View style={styles.form}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[styles.input, focus === "email" && styles.inputFocus]}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setFocus("email")}
+                onBlur={() => setFocus(null)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="username"
+                placeholder="you@example.com"
+                placeholderTextColor={C.inkSoft}
+              />
+
+              <Text style={[styles.label, { marginTop: 18 }]}>Password</Text>
+              <TextInput
+                style={[styles.input, focus === "password" && styles.inputFocus]}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setFocus("password")}
+                onBlur={() => setFocus(null)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                textContentType="password"
+                placeholder="••••••••"
+                placeholderTextColor={C.inkSoft}
+                onSubmitEditing={() => void signIn()}
+                returnKeyType="go"
+              />
+
+              <Pressable
+                style={styles.remember}
+                onPress={() => setRemember((r) => !r)}
+                hitSlop={8}
+              >
+                <View style={[styles.checkbox, remember && styles.checkboxOn]}>
+                  {remember && <Text style={styles.checkboxTick}>✓</Text>}
+                </View>
+                <Text style={styles.rememberText}>Keep me signed in</Text>
+              </Pressable>
+
+              {authError && <Text style={styles.error}>{authError}</Text>}
+
+              <Pressable
+                style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+                onPress={() => void signIn()}
+              >
+                <Text style={styles.ctaText}>Sign in</Text>
+              </Pressable>
+              <Text style={styles.authHint}>
+                Google sign-in coming soon.
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
   }
 
   // QR scanner.
@@ -432,6 +552,9 @@ function AppInner() {
                 }}
               >
                 <Text style={styles.ghostText}>Scan host QR code</Text>
+              </Pressable>
+              <Pressable style={styles.ghost} onPress={() => void signOut()}>
+                <Text style={styles.signOutText}>Sign out</Text>
               </Pressable>
             </View>
           </View>
@@ -604,6 +727,27 @@ const styles = StyleSheet.create({
   ctaText: { fontFamily: F.bold, color: "#1A0E06", fontSize: 16, letterSpacing: 0.3 },
   ghost: { paddingVertical: 14, alignItems: "center" },
   ghostText: { fontFamily: F.semibold, color: C.inkSoft, fontSize: 14 },
+  signOutText: { fontFamily: F.semibold, color: "#FF6B6B", fontSize: 14 },
+  remember: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 18 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: C.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxOn: { backgroundColor: C.signal, borderColor: C.signal },
+  checkboxTick: { color: "#0A0C16", fontSize: 13, fontWeight: "700", lineHeight: 16 },
+  rememberText: { fontFamily: F.medium, color: C.ink, fontSize: 14 },
+  authHint: {
+    fontFamily: F.regular,
+    color: C.inkSoft,
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 14,
+  },
   body: { fontFamily: F.regular, color: C.ink, textAlign: "center", marginBottom: 18, fontSize: 15 },
 
   // connection bar
