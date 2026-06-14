@@ -20,6 +20,9 @@ const DEFAULT_PORT = 41234;
 // Enable native system-audio loopback capture (Spotify etc.) with no BlackHole.
 // Must run before the app is ready — it appends Chromium feature switches and
 // registers the enable/disable IPC the renderer drives via the preload bridge.
+// Plain loopback (not loopbackWithMute): macOS can't mute the source anyway, and
+// muting would silence the source on Windows — so the source keeps playing and
+// the phones act as the synced satellites.
 initLoopbackAudio();
 
 let serverProcess: ChildProcess | null = null;

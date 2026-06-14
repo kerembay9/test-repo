@@ -116,6 +116,10 @@ export default function HostDashboard() {
   // Local intent to stream, so the host's signaling mailbox opens immediately
   // instead of waiting for the `live` flag to round-trip through a snapshot.
   const [streaming, setStreaming] = useState(false);
+  // How the live audio is being captured. In "loopback" the original output is
+  // muted (loopbackWithMute), so the Mac monitor can use the default speakers
+  // without doubling/feeding back; other modes need a real-speaker device.
+  const [captureMode, setCaptureMode] = useState<"device" | "tab" | "loopback" | null>(null);
   // Native desktop bridge (preload). Present only in the Electron app; unlocks
   // one-click system-audio capture. Set in an effect to avoid SSR/hydration skew.
   const [isElectron, setIsElectron] = useState(false);
@@ -367,7 +371,12 @@ export default function HostDashboard() {
         throw new Error("That source has no audio track to stream.");
       }
       captureRef.current = stream;
-      setCapturedLabel(stream.getAudioTracks()[0]?.label || "unknown input");
+      setCaptureMode(mode);
+      setCapturedLabel(
+        mode === "loopback"
+          ? "System audio"
+          : stream.getAudioTracks()[0]?.label || "unknown input",
+      );
       broadcasterRef.current = new HostBroadcaster(stream, sendSignal);
       // Open our signaling mailbox before any answers can come back.
       setStreaming(true);
@@ -387,6 +396,7 @@ export default function HostDashboard() {
       captureRef.current?.getTracks().forEach((t) => t.stop());
       captureRef.current = null;
       setStreaming(false);
+      setCaptureMode(null);
       await sendControl({ action: "endLive" });
     });
 
@@ -680,12 +690,12 @@ export default function HostDashboard() {
                 </summary>
                 <div className="space-y-3 border-t border-border p-3">
                 <p className="text-xs text-muted-foreground">
-                  Phones lag by WebRTC&apos;s buffer, so this Mac sounds early. To
-                  delay it, the app plays the captured audio to your real speakers
-                  through a delay. Set the Mac&apos;s system output to{" "}
-                  <span className="text-foreground font-medium">BlackHole only</span>{" "}
-                  (not the Multi-Output), then pick your real speakers as the app
-                  output below so it doesn&apos;t feed back.
+                  Phones lag by WebRTC&apos;s buffer, so this Mac sounds a touch
+                  early. macOS can&apos;t mute the source on its own speakers, so to
+                  play here in sync the delayed audio must go to a{" "}
+                  <span className="text-foreground font-medium">different output</span>{" "}
+                  than the source — pick headphones (or other speakers) below.
+                  Otherwise leave this off and let the phones be the speakers.
                 </p>
 
                 {!monitorOn ? (
@@ -696,14 +706,19 @@ export default function HostDashboard() {
                       onFocus={() => void refreshInputs()}
                       onChange={(e) => setOutputId(e.target.value)}
                     >
-                      <option value="">App output: system default…</option>
+                      <option value="">App output: pick headphones/other…</option>
                       {outputs.map((d) => (
                         <option key={d.deviceId} value={d.deviceId}>
                           {d.label || "Unlabeled output"}
                         </option>
                       ))}
                     </select>
-                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void enableMonitor()}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void enableMonitor()}
+                    >
                       Play on this Mac (delayed)
                     </Button>
                   </div>
