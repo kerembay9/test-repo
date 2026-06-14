@@ -47,6 +47,9 @@ ipcMain.handle("audio-set-output", (_e, name: string) =>
   switchAudio(["-s", name, "-t", "output"]),
 );
 
+// Open a URL in the system browser (preload bridge can't reach shell directly).
+ipcMain.handle("open-external", (_e, url: string) => shell.openExternal(url));
+
 let serverProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;

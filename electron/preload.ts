@@ -3,13 +3,14 @@
 // small, explicit surface. The host UI already works unmodified in the browser;
 // these are conveniences a renderer can feature-detect via `window.surround`.
 
-import { contextBridge, ipcRenderer, shell } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("surround", {
   isElectron: true,
   platform: process.platform,
   appVersion: process.env.npm_package_version ?? null,
-  openExternal: (url: string) => shell.openExternal(url),
+  // shell isn't available in a sandboxed preload — go through main via IPC.
+  openExternal: (url: string) => ipcRenderer.invoke("open-external", url),
 
   // Native system-audio loopback (electron-audio-loopback). The renderer wraps
   // these around its own getDisplayMedia() call (the MediaStream can't cross the
