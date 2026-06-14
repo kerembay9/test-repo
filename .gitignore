@@ -50,3 +50,6 @@ mobile/dist/
 
 # license signing key — secret, never commit
 /licensing/private-key.pem
+
+# buy-service deps
+buy-service/node_modules
