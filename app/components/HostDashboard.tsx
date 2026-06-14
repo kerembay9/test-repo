@@ -3,12 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/app/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/app/components/ui/card";
+import { Card } from "@/app/components/ui/card";
 import { AudioEngine } from "@/lib/sync/audio-engine";
 import { sendControl, uploadTrack } from "@/lib/sync/client";
 import { randomId } from "@/lib/sync/id";
@@ -67,6 +62,54 @@ function readDuration(url: string): Promise<number> {
     a.onerror = () => resolve(0);
     a.src = url;
   });
+}
+
+/** Numbered step header inside a panel. */
+function Step({ n, title, hint }: { n: number; title: string; hint?: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-sm font-semibold text-primary tabular-nums">
+        {n}
+      </span>
+      <div className="min-w-0">
+        <h2 className="wordmark text-base font-semibold uppercase tracking-[0.12em] text-foreground">
+          {title}
+        </h2>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Big source-choice button (track vs capture). */
+function SourceBtn({
+  active,
+  onClick,
+  label,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "rounded-xl border px-4 py-3 text-left transition-colors " +
+        (active
+          ? "border-primary/60 bg-primary/10"
+          : "border-border bg-background/40 hover:border-border/80 hover:bg-card")
+      }
+    >
+      <div className={"text-sm font-semibold " + (active ? "text-primary" : "text-foreground")}>
+        {label}
+      </div>
+      <div className="text-xs text-muted-foreground">{sub}</div>
+    </button>
+  );
 }
 
 export default function HostDashboard() {
@@ -609,17 +652,12 @@ export default function HostDashboard() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-5 py-7 lg:px-8 lg:py-10">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] pb-6">
-        <div className="space-y-1.5">
-          <h1 className="flex items-baseline gap-2.5">
-            <span className="wordmark-strong text-3xl sm:text-4xl text-foreground">SURROUND</span>
-            <span className="wordmark-thin text-lg sm:text-xl text-primary">HOST</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            The phones around you become one synchronized speaker.
-          </p>
-        </div>
+    <div className="mx-auto max-w-2xl px-5 py-8 lg:py-12">
+      <header className="mb-8 flex items-center justify-between gap-4">
+        <h1 className="flex items-baseline gap-2.5">
+          <span className="wordmark-strong text-2xl text-foreground">SURROUND</span>
+          <span className="wordmark-thin text-base text-primary">HOST</span>
+        </h1>
         <span className="status-pill" data-live={connected}>
           <span className="status-dot" />
           {connected ? "Live" : "Connecting…"}
@@ -627,426 +665,32 @@ export default function HostDashboard() {
       </header>
 
       {err && (
-        <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="mb-5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
           {err}
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="space-y-5">
-          <div className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
-            <button
-              type="button"
-              disabled={live}
-              onClick={() => setSourceMode("track")}
-              className={`rounded-md px-4 py-1.5 font-medium transition-colors ${
-                !live && sourceMode === "track"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              } ${live ? "opacity-40" : ""}`}
-            >
-              Play a track
-            </button>
-            <button
-              type="button"
-              onClick={() => setSourceMode("live")}
-              className={`rounded-md px-4 py-1.5 font-medium transition-colors ${
-                live || sourceMode === "live"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Stream this Mac
-            </button>
-          </div>
-
-          {!live && sourceMode === "track" ? (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Choose a track</CardTitle>
-                </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" disabled={busy} onClick={() => chooseTrack(BUNDLED_TRACK)}>
-              Use bundled test sound
-            </Button>
-            <label>
-              <input
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void onUpload(f);
-                  e.target.value = "";
-                }}
-              />
-              <Button variant="outline" disabled={busy} asChild>
-                <span>Upload a song…</span>
-              </Button>
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
-              placeholder="…or paste an audio URL"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onUrl()}
-            />
-            <Button variant="outline" disabled={busy || !urlInput.trim()} onClick={onUrl}>
-              Load
-            </Button>
-          </div>
-          {track && (
-            <p className="text-sm text-muted-foreground">
-              Loaded: <span className="text-foreground font-medium">{track.name}</span>
+      <div className="space-y-5">
+        {/* 1 — Connect phones */}
+        <Card className="px-6">
+          <Step n={1} title="Connect your phones" hint="Same Wi-Fi as this computer" />
+          <div className="flex flex-col items-center gap-4">
+            {joinUrl && (
+              <div className="rounded-2xl bg-white p-3 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)]">
+                <QRCodeSVG value={joinUrl} size={188} marginSize={0} />
+              </div>
+            )}
+            <p className="text-center text-sm text-muted-foreground">
+              Scan with each phone&apos;s camera, or open this address:
             </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Playback</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            {isPlaying ? (
-              <Button onClick={pause} disabled={busy || !track}>
-                Pause
-              </Button>
-            ) : (
-              <Button onClick={play} disabled={busy || !track}>
-                Play
-              </Button>
-            )}
-            <Button variant="outline" onClick={stop} disabled={busy || !track}>
-              Stop
-            </Button>
-            <span className="ml-auto text-sm tabular-nums text-muted-foreground">
-              {fmt(scrubbing ?? displayPos)} / {fmt(duration)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={0.5}
-            disabled={!track || !duration}
-            value={scrubbing ?? Math.min(displayPos, duration || 0)}
-            onChange={(e) => setScrubbing(Number(e.target.value))}
-            onMouseUp={() => {
-              if (scrubbing !== null) {
-                const p = scrubbing;
-                setScrubbing(null);
-                void seek(p);
-              }
-            }}
-            onTouchEnd={() => {
-              if (scrubbing !== null) {
-                const p = scrubbing;
-                setScrubbing(null);
-                void seek(p);
-              }
-            }}
-            className="w-full"
-          />
-
-          <div className="rounded-md border p-3 space-y-2">
-            {hostAudioOn ? (
-              <>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">This computer is playing audio</span>
-                  <span className="text-muted-foreground">{Math.round(hostVolume * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={hostVolume}
-                  onChange={(e) => setHostVolume(Number(e.target.value))}
-                  className="w-full"
-                />
-              </>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-muted-foreground">
-                  Play sound from this computer too (main stereo pair)
-                </span>
-                <Button size="sm" variant="secondary" onClick={() => void enableHostAudio()}>
-                  Enable
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-            </>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Stream this Mac (Spotify / system audio)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {live ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm">
-                  <span className="text-red-500">●</span> Streaming{" "}
-                  <span className="font-medium">{capturedLabel || "audio"}</span>{" "}
-                  to {speakers.length} speaker
-                  {speakers.length === 1 ? "" : "s"}.
-                </span>
-                <Button variant="outline" disabled={busy} onClick={() => void stopLive()}>
-                  Stop streaming
-                </Button>
-              </div>
-              {/(microphone|default|built-in|macbook.*microphone)/i.test(
-                capturedLabel,
-              ) && (
-                <p className="text-xs text-destructive">
-                  That looks like a microphone, not BlackHole — phones will hear
-                  the room, not Spotify. Stop, then pick{" "}
-                  <span className="font-medium">BlackHole 2ch</span> as the input.
-                </p>
-              )}
-
-              <details className="rounded-md border">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium">
-                  <span>Align this Mac with the phones</span>
-                  <span className="text-xs text-muted-foreground">optional</span>
-                </summary>
-                <div className="space-y-3 border-t border-border p-3">
-                <p className="text-xs text-muted-foreground">
-                  Phones lag by WebRTC&apos;s buffer, so this Mac sounds a touch
-                  early. macOS can&apos;t mute the source on its own speakers, so to
-                  play here in sync the delayed audio must go to a{" "}
-                  <span className="text-foreground font-medium">different output</span>{" "}
-                  than the source — pick headphones (or other speakers) below.
-                  Otherwise leave this off and let the phones be the speakers.
-                </p>
-
-                {!monitorOn ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      className="rounded-md border bg-background px-2 py-2 text-sm max-w-[14rem]"
-                      value={outputId}
-                      onFocus={() => void refreshInputs()}
-                      onChange={(e) => setOutputId(e.target.value)}
-                    >
-                      <option value="">App output: pick headphones/other…</option>
-                      {outputs.map((d) => (
-                        <option key={d.deviceId} value={d.deviceId}>
-                          {d.label || "Unlabeled output"}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void enableMonitor()}
-                    >
-                      Play on this Mac (delayed)
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Delay this Mac</span>
-                      <Button size="sm" variant="ghost" onClick={disableMonitor}>
-                        Turn off
-                      </Button>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1000}
-                      step={5}
-                      value={hostTrimMs}
-                      onChange={(e) => setHostTrimMs(Number(e.target.value))}
-                      className="w-full"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(-25)}>
-                        −25
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(-5)}>
-                        −5
-                      </Button>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={1000}
-                          step={5}
-                          value={hostTrimMs}
-                          onChange={(e) => setDelayMs(Number(e.target.value))}
-                          className="w-20 rounded-md border bg-background px-2 py-1 text-sm text-right tabular-nums"
-                        />
-                        <span className="text-sm text-muted-foreground">ms</span>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(5)}>
-                        +5
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => nudgeDelay(25)}>
-                        +25
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={suggestedDelay === null}
-                        onClick={() => suggestedDelay !== null && setDelayMs(suggestedDelay)}
-                      >
-                        {suggestedDelay === null
-                          ? "Measuring phones…"
-                          : `Auto-set to measured (${suggestedDelay} ms)`}
-                      </Button>
-                      {measuredLatencies.length > 0 && (
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          phones:{" "}
-                          {measuredLatencies
-                            .map((v) => `${Math.round(v)}ms`)
-                            .join(", ")}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Auto-set reads each phone&apos;s WebRTC buffer + network
-                      latency (give it a few seconds to settle), then fine-tune by
-                      ear with ±5. Most Wi-Fi setups land around 150–400 ms.
-                    </p>
-                  </>
-                )}
-                </div>
-              </details>
-            </div>
-          ) : (
-            <>
-              {isElectron && (
-                <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
-                  <Button disabled={busy} onClick={() => void startLive("loopback")}>
-                    Capture this Mac&apos;s audio (Spotify, etc.)
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    One click — no BlackHole, no setup. On macOS, approve{" "}
-                    <span className="text-foreground font-medium">Screen Recording</span>{" "}
-                    the first time, then it just works. The Mac keeps playing the
-                    sound directly; the phones are the synced satellites.
-                  </p>
-                  <div className="border-t border-primary/20 pt-2">
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void enableMacSpeaker()}
-                    >
-                      Use this Mac as a speaker too (in sync)
-                    </Button>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Routes the sound through{" "}
-                      <span className="text-foreground font-medium">BlackHole</span>{" "}
-                      so this Mac can play in sync with the phones. Auto-switches
-                      output and restores it on stop. Needs BlackHole installed
-                      (one-time) — I&apos;ll open the download if it&apos;s missing.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {isElectron ? "Advanced — or " : "Send whatever is playing on this Mac (e.g. Spotify) to the phones. "}
-                pick a loopback input like{" "}
-                <span className="text-foreground font-medium">BlackHole</span>{" "}
-                (route Spotify into it via a macOS Multi-Output Device), or share
-                a browser tab&apos;s audio.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" disabled={busy} onClick={() => void refreshInputs()}>
-                  Scan devices
-                </Button>
-                <select
-                  className="rounded-md border bg-background px-2 py-2 text-sm max-w-[16rem]"
-                  value={inputId}
-                  onFocus={() => void refreshInputs()}
-                  onChange={(e) => setInputId(e.target.value)}
-                >
-                  <option value="">Default input (usually the mic)…</option>
-                  {inputs.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || "Unlabeled input"}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => void startLive("device")}
-                >
-                  Stream selected input
-                </Button>
-                <Button variant="outline" disabled={busy} onClick={() => void startLive("tab")}>
-                  Share a tab instead
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Click <span className="text-foreground font-medium">Scan devices</span>{" "}
-                (allow the mic prompt), then pick{" "}
-                <span className="text-foreground font-medium">BlackHole 2ch</span>{" "}
-                — not the default, which captures your microphone.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Live streaming can&apos;t be sample-aligned like files — expect a
-                small, steady lag versus this Mac&apos;s own speakers. Use each
-                phone&apos;s delay trim to line them up.
-              </p>
-            </>
-          )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <aside className="space-y-5 lg:sticky lg:top-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Add speakers</CardTitle>
-              <span className="text-sm text-muted-foreground">
-                {speakers.length} connected
-              </span>
-            </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Open the <span className="text-foreground font-medium">Surround
-            Speaker</span> app on each phone (same Wi-Fi) and{" "}
-            <span className="text-foreground font-medium">scan this code</span> —
-            or open the address below in a browser and tap Join.
-          </p>
-          {joinUrl && (
-            <div className="flex justify-center py-2">
-              <div className="rounded-lg bg-white p-3">
-                <QRCodeSVG value={joinUrl} size={168} marginSize={0} />
-              </div>
-            </div>
-          )}
-          <div className="space-y-2">
-            <code className="block w-full rounded-md border bg-muted/40 px-3 py-2 text-sm break-all">
+            <code className="block w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-center text-sm break-all">
               {joinUrl || "…"}
             </code>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={() => void copyJoin()}
-              >
-                {copied ? "Copied" : "Copy link"}
+            <div className="flex w-full gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => void copyJoin()}>
+                {copied ? "Copied ✓" : "Copy link"}
               </Button>
               <Button
-                size="sm"
                 variant="outline"
                 className="flex-1"
                 disabled={refreshing}
@@ -1060,101 +704,362 @@ export default function HostDashboard() {
                 {refreshing ? "Refreshing…" : "Refresh"}
               </Button>
             </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Changed Wi-Fi or hotspot? Tap{" "}
-            <span className="text-foreground font-medium">Refresh</span> to update
-            this address and re-announce the host on the new network.
-          </p>
-          <div>
-            <p className="text-sm font-medium mb-1">
-              Connected speakers ({speakers.length})
-            </p>
-            {speakers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No phones joined yet.</p>
-            ) : (
-              <ul className="space-y-1">
-                {speakers.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center gap-2 text-sm rounded-md border px-3 py-2"
-                  >
-                    <span className="size-2 rounded-full bg-[var(--live)]" />
-                    {s.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Plan / license (desktop host only). */}
-          {license && (
-            <div className="border-t border-white/[0.06] pt-5">
-              {license.licensed ? (
-                <div className="flex items-center gap-2.5 text-sm">
-                  <span className="status-pill" data-live="true">
-                    <span className="status-dot" />
-                    Surround Pro
-                  </span>
-                  <span className="text-muted-foreground">Unlimited speakers</span>
-                </div>
+            <div className="w-full">
+              {speakers.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground">
+                  Waiting for phones to join…
+                </p>
               ) : (
-                <div className="panel-pro space-y-3.5 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="wordmark text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                        Surround Pro
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Free covers {license.freeLimit} phones. Go unlimited.
-                      </p>
-                    </div>
-                    <div className="text-right leading-none">
-                      <div className="wordmark-strong text-2xl text-foreground tabular-nums">
-                        600<span className="ml-1 text-base font-normal text-muted-foreground">TL</span>
-                      </div>
-                      <div className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
-                        KDV dahil · tek seferlik
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    className="w-full shadow-[0_10px_30px_-12px_var(--primary)]"
-                    onClick={() => {
-                      // Hosted endpoint (EC2) creates a session and redirects to
-                      // the PayTR checkout; the API key stays on the server.
-                      if (surroundApi?.openExternal) surroundApi.openExternal(BUY_URL);
-                      else window.open(BUY_URL, "_blank");
-                    }}
-                  >
-                    Get Pro — unlock every phone
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={licenseKey}
-                      onChange={(e) => setLicenseKey(e.target.value)}
-                      placeholder="Already have a key?"
-                      className="min-w-0 flex-1 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!licenseKey.trim()}
-                      onClick={() => void activateLicense()}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {speakers.map((s) => (
+                    <span
+                      key={s.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm"
                     >
-                      Activate
-                    </Button>
-                  </div>
-                  {licenseMsg && (
-                    <p className="text-xs text-muted-foreground">{licenseMsg}</p>
-                  )}
+                      <span className="size-1.5 rounded-full bg-[var(--live)]" />
+                      {s.name}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
+            {license && !license.licensed && speakers.length >= license.freeLimit && (
+              <p className="text-center text-xs text-primary">
+                You&apos;re at the free {license.freeLimit}-phone limit — get Pro below to add more.
+              </p>
+            )}
+          </div>
+        </Card>
+
+        {/* 2 — What plays */}
+        <Card className="px-6">
+          <Step n={2} title="Choose what plays" />
+          <div className="grid grid-cols-2 gap-2">
+            <SourceBtn
+              active={sourceMode === "track"}
+              onClick={() => setSourceMode("track")}
+              label="Play a track"
+              sub="Music file or link"
+            />
+            <SourceBtn
+              active={sourceMode === "live"}
+              onClick={() => setSourceMode("live")}
+              label="Capture this Mac"
+              sub="Spotify / system audio"
+            />
+          </div>
+
+          {sourceMode === "track" ? (
+            <div className="mt-4 space-y-4">
+              {track && (
+                <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-medium">{track.name}</span>
+                    <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                      {fmt(scrubbing ?? displayPos)} / {fmt(duration)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 0}
+                    step={0.5}
+                    disabled={!duration}
+                    value={scrubbing ?? Math.min(displayPos, duration || 0)}
+                    onChange={(e) => setScrubbing(Number(e.target.value))}
+                    onMouseUp={() => {
+                      if (scrubbing !== null) {
+                        const p = scrubbing;
+                        setScrubbing(null);
+                        void seek(p);
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      if (scrubbing !== null) {
+                        const p = scrubbing;
+                        setScrubbing(null);
+                        void seek(p);
+                      }
+                    }}
+                    className="w-full"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={busy}
+                      onClick={() => (isPlaying ? void pause() : void play())}
+                    >
+                      {isPlaying ? "Pause" : "Play"}
+                    </Button>
+                    <Button variant="outline" disabled={busy} onClick={stop}>
+                      Stop
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {track ? "Change track" : "Pick a track"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => chooseTrack(BUNDLED_TRACK)}>
+                    Test sound
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <label className="cursor-pointer">
+                      Upload file…
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void onUpload(f);
+                        }}
+                      />
+                    </label>
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="…or paste an audio URL"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
+                  />
+                  <Button size="sm" variant="outline" disabled={!urlInput.trim()} onClick={onUrl}>
+                    Load
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5">
+                <span className="text-sm text-muted-foreground">Play on this computer too</span>
+                {hostAudioOn ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={hostVolume}
+                      onChange={(e) => setHostVolume(Number(e.target.value))}
+                      className="w-24"
+                    />
+                    <span className="w-9 text-right text-sm tabular-nums text-muted-foreground">
+                      {Math.round(hostVolume * 100)}%
+                    </span>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={() => void enableHostAudio()}>
+                    Enable
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {isElectron ? (
+                live ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 p-4">
+                    <span className="text-sm">
+                      <span className="text-[var(--live)]">●</span> Streaming{" "}
+                      <span className="font-medium">{capturedLabel || "audio"}</span> to{" "}
+                      {speakers.length} phone{speakers.length === 1 ? "" : "s"}
+                    </span>
+                    <Button variant="outline" size="sm" disabled={busy} onClick={() => void stopLive()}>
+                      Stop
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button className="w-full" disabled={busy} onClick={() => void startLive("loopback")}>
+                      Capture this Mac&apos;s audio
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      One click — no setup. On macOS, approve{" "}
+                      <span className="text-foreground font-medium">Screen Recording</span> the first
+                      time. The Mac keeps playing; the phones are the synced satellites.
+                    </p>
+                  </>
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Open the Surround desktop app to capture this Mac&apos;s audio. In a browser, play a
+                  track instead — or pick a loopback input under Advanced.
+                </p>
+              )}
+            </div>
           )}
-            </CardContent>
-          </Card>
-        </aside>
+        </Card>
+
+        {/* Advanced */}
+        <details className="overflow-hidden rounded-2xl border border-white/[0.06] bg-card/40">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 text-sm font-medium">
+            <span>Advanced</span>
+            <span className="text-xs text-muted-foreground">timing · BlackHole · devices</span>
+          </summary>
+          <div className="space-y-6 border-t border-white/[0.06] p-5">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Line this Mac up with the phones</p>
+              <p className="text-xs text-muted-foreground">
+                Phones lag by the stream buffer, so this Mac sounds early. Play the captured audio
+                back through a different output (headphones), delayed, to match.
+              </p>
+              {!monitorOn ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="max-w-[16rem] rounded-md border border-border bg-background px-2 py-2 text-sm"
+                    value={outputId}
+                    onFocus={() => void refreshInputs()}
+                    onChange={(e) => setOutputId(e.target.value)}
+                  >
+                    <option value="">App output: pick headphones/other…</option>
+                    {outputs.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || "Unlabeled output"}
+                      </option>
+                    ))}
+                  </select>
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => void enableMonitor()}>
+                    Play on this Mac (delayed)
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm tabular-nums">Delay {hostTrimMs} ms</span>
+                    <Button size="sm" variant="ghost" onClick={disableMonitor}>
+                      Turn off
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => nudgeDelay(-25)}>-25</Button>
+                    <Button size="sm" variant="outline" onClick={() => nudgeDelay(-5)}>-5</Button>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1000}
+                      step={5}
+                      value={hostTrimMs}
+                      onChange={(e) => setDelayMs(Number(e.target.value))}
+                      className="w-20 rounded-md border border-border bg-background px-2 py-1 text-right text-sm tabular-nums"
+                    />
+                    <Button size="sm" variant="outline" onClick={() => nudgeDelay(5)}>+5</Button>
+                    <Button size="sm" variant="outline" onClick={() => nudgeDelay(25)}>+25</Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={suggestedDelay === null}
+                      onClick={() => suggestedDelay !== null && setDelayMs(suggestedDelay)}
+                    >
+                      {suggestedDelay === null ? "Measuring…" : `Auto (${suggestedDelay} ms)`}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isElectron && (
+              <div className="space-y-2 border-t border-white/[0.06] pt-5">
+                <p className="text-sm font-medium">Use this Mac as a speaker too (in sync)</p>
+                <p className="text-xs text-muted-foreground">
+                  Routes the sound through BlackHole so this Mac&apos;s own speakers play in sync.
+                  Auto-switches output and restores it on stop. Needs BlackHole installed.
+                </p>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void enableMacSpeaker()}>
+                  Set up BlackHole sync
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-2 border-t border-white/[0.06] pt-5">
+              <p className="text-sm font-medium">Capture a specific input or a browser tab</p>
+              <p className="text-xs text-muted-foreground">
+                For BlackHole/loopback inputs, or sharing one tab&apos;s audio.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => void refreshInputs()}>
+                  Scan devices
+                </Button>
+                <select
+                  className="max-w-[14rem] rounded-md border border-border bg-background px-2 py-2 text-sm"
+                  value={inputId}
+                  onFocus={() => void refreshInputs()}
+                  onChange={(e) => setInputId(e.target.value)}
+                >
+                  <option value="">Default input…</option>
+                  {inputs.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || "Unlabeled input"}
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void startLive("device")}>
+                  Stream input
+                </Button>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void startLive("tab")}>
+                  Share a tab
+                </Button>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        {/* Pro / license */}
+        {license &&
+          (license.licensed ? (
+            <div className="flex items-center gap-2.5 text-sm">
+              <span className="status-pill" data-live="true">
+                <span className="status-dot" />
+                Surround Pro
+              </span>
+              <span className="text-muted-foreground">Unlimited speakers</span>
+            </div>
+          ) : (
+            <div className="panel-pro space-y-3.5 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="wordmark text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                    Surround Pro
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Free covers {license.freeLimit} phones. Go unlimited.
+                  </p>
+                </div>
+                <div className="text-right leading-none">
+                  <div className="wordmark-strong text-2xl text-foreground tabular-nums">
+                    600<span className="ml-1 text-base font-normal text-muted-foreground">TL</span>
+                  </div>
+                  <div className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
+                    KDV dahil · tek seferlik
+                  </div>
+                </div>
+              </div>
+              <Button
+                className="w-full shadow-[0_10px_30px_-12px_var(--primary)]"
+                onClick={() => {
+                  if (surroundApi?.openExternal) surroundApi.openExternal(BUY_URL);
+                  else window.open(BUY_URL, "_blank");
+                }}
+              >
+                Get Pro — unlock every phone
+              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  value={licenseKey}
+                  onChange={(e) => setLicenseKey(e.target.value)}
+                  placeholder="Already have a key?"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
+                />
+                <Button size="sm" variant="outline" disabled={!licenseKey.trim()} onClick={() => void activateLicense()}>
+                  Activate
+                </Button>
+              </div>
+              {licenseMsg && <p className="text-xs text-muted-foreground">{licenseMsg}</p>}
+            </div>
+          ))}
       </div>
     </div>
   );
