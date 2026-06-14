@@ -16,4 +16,10 @@ contextBridge.exposeInMainWorld("surround", {
   // context bridge, so capture must happen in the page).
   enableLoopbackAudio: () => ipcRenderer.invoke("enable-loopback-audio"),
   disableLoopbackAudio: () => ipcRenderer.invoke("disable-loopback-audio"),
+
+  // macOS default-output control (SwitchAudioSource) for the BlackHole flow.
+  audioListOutputs: (): Promise<string[]> => ipcRenderer.invoke("audio-list-outputs"),
+  audioGetOutput: (): Promise<string> => ipcRenderer.invoke("audio-get-output"),
+  audioSetOutput: (name: string): Promise<string> =>
+    ipcRenderer.invoke("audio-set-output", name),
 });

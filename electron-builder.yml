@@ -16,6 +16,9 @@ files:
 extraResources:
   - from: .next/standalone
     to: standalone
+  # Bundled CLI for switching the macOS default output device (BlackHole flow).
+  - from: electron/build-resources/bin
+    to: bin
 
 asar: true
 

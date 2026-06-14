@@ -7,9 +7,10 @@
 // then opens a window pointed at http://localhost:<port>/ (a secure context,
 // required for audio capture).
 
-import { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage } from "electron";
+import { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage, ipcMain } from "electron";
 import { initMain as initLoopbackAudio } from "electron-audio-loopback";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { promisify } from "node:util";
 import { createServer } from "node:net";
 import http from "node:http";
 import path from "node:path";
@@ -24,6 +25,27 @@ const DEFAULT_PORT = 41234;
 // muting would silence the source on Windows — so the source keeps playing and
 // the phones act as the synced satellites.
 initLoopbackAudio();
+
+// macOS default-output control via the bundled SwitchAudioSource CLI. Used by
+// the "use this Mac as a speaker too" flow to route the source into BlackHole
+// and restore the real speakers afterwards.
+const execFileP = promisify(execFile);
+function switchAudioPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "bin", "SwitchAudioSource")
+    : path.join(app.getAppPath(), "electron", "build-resources", "bin", "SwitchAudioSource");
+}
+async function switchAudio(args: string[]): Promise<string> {
+  const { stdout } = await execFileP(switchAudioPath(), args);
+  return stdout.trim();
+}
+ipcMain.handle("audio-list-outputs", async () =>
+  (await switchAudio(["-a", "-t", "output"])).split("\n").map((s) => s.trim()).filter(Boolean),
+);
+ipcMain.handle("audio-get-output", () => switchAudio(["-c", "-t", "output"]));
+ipcMain.handle("audio-set-output", (_e, name: string) =>
+  switchAudio(["-s", name, "-t", "output"]),
+);
 
 let serverProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;

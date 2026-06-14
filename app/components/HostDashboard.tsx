@@ -25,9 +25,14 @@ import {
 // in a plain browser.
 type SurroundBridge = {
   isElectron?: boolean;
+  openExternal?: (url: string) => void;
   enableLoopbackAudio?: () => Promise<void>;
   disableLoopbackAudio?: () => Promise<void>;
+  audioListOutputs?: () => Promise<string[]>;
+  audioGetOutput?: () => Promise<string>;
+  audioSetOutput?: (name: string) => Promise<string>;
 };
+const BLACKHOLE_URL = "https://existential.audio/blackhole/";
 const surroundApi: SurroundBridge | undefined =
   typeof window !== "undefined"
     ? (window as unknown as { surround?: SurroundBridge }).surround
@@ -128,6 +133,9 @@ export default function HostDashboard() {
   }, []);
   const captureRef = useRef<MediaStream | null>(null);
   const broadcasterRef = useRef<HostBroadcaster | null>(null);
+  // Real output device to restore after the BlackHole "Mac as a speaker" flow
+  // swapped the system output. Null when we didn't change it.
+  const prevSystemOutputRef = useRef<string | null>(null);
   const onSignal = useCallback((msg: SignalMessage) => {
     void broadcasterRef.current?.onSignal(msg);
   }, []);
@@ -397,7 +405,88 @@ export default function HostDashboard() {
       captureRef.current = null;
       setStreaming(false);
       setCaptureMode(null);
+      // Restore the system output if the BlackHole flow swapped it.
+      if (prevSystemOutputRef.current && surroundApi?.audioSetOutput) {
+        await surroundApi.audioSetOutput(prevSystemOutputRef.current).catch(() => {});
+        prevSystemOutputRef.current = null;
+      }
       await sendControl({ action: "endLive" });
+    });
+
+  // "Use this Mac as a speaker too": route the system output into BlackHole (so
+  // the source no longer hits the real speakers), capture BlackHole, broadcast
+  // to phones, and replay delayed to the real speakers — so the Mac plays in
+  // sync. Restores the output on stop. Needs BlackHole installed.
+  const enableMacSpeaker = () =>
+    guard(async () => {
+      const api = surroundApi;
+      if (!api?.audioListOutputs || !api.audioGetOutput || !api.audioSetOutput) {
+        throw new Error("This needs the desktop app.");
+      }
+      const outNames = await api.audioListOutputs();
+      const blackhole = outNames.find((n) => /blackhole/i.test(n));
+      if (!blackhole) {
+        api.openExternal?.(BLACKHOLE_URL);
+        throw new Error(
+          "BlackHole isn't installed. I opened the download page — install it " +
+            "(one-time), then try again.",
+        );
+      }
+      // Prime permission, then resolve the BlackHole input + real-speaker output.
+      const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tmp.getTracks().forEach((t) => t.stop());
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const bhIn = devs.find(
+        (d) => d.kind === "audioinput" && /blackhole/i.test(d.label),
+      );
+      if (!bhIn) throw new Error("Couldn't find the BlackHole input device.");
+
+      const prev = await api.audioGetOutput();
+      const realOut =
+        devs.find((d) => d.kind === "audiooutput" && d.label === prev) ??
+        devs.find((d) => d.kind === "audiooutput" && d.deviceId === "default");
+      if (!realOut) throw new Error("Couldn't find your real speakers to play back on.");
+
+      // Route the source into BlackHole (remember the real output to restore).
+      await api.audioSetOutput(blackhole);
+      prevSystemOutputRef.current = prev;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: bhIn.deviceId },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        // Broadcast to phones.
+        captureRef.current = stream;
+        setCaptureMode("device");
+        setCapturedLabel("This Mac (via BlackHole)");
+        broadcasterRef.current = new HostBroadcaster(stream, sendSignal);
+        setStreaming(true);
+        await sendControl({ action: "goLive", hostId });
+        broadcasterRef.current.syncSpeakers(
+          (snapshotRef.current?.speakers ?? []).map((s) => s.id),
+        );
+        // Replay on the real speakers, delayed, to line up with the phones.
+        if (!engineRef.current) engineRef.current = new AudioEngine();
+        const engine = engineRef.current;
+        await engine.unlock();
+        await engine.setOutputDevice(realOut.deviceId);
+        const start = suggestedDelay ?? (hostTrimMs || 250);
+        setHostTrimMs(start);
+        engine.setTrimMs(start);
+        engine.attachStream(stream);
+        setOutputId(realOut.deviceId);
+        setMonitorOn(true);
+      } catch (e) {
+        // Restore the output if anything failed mid-setup.
+        await api.audioSetOutput(prev).catch(() => {});
+        prevSystemOutputRef.current = null;
+        throw e;
+      }
     });
 
   // Play the captured stream locally through the delay node so the Mac's own
@@ -805,8 +894,25 @@ export default function HostDashboard() {
                   <p className="text-xs text-muted-foreground">
                     One click — no BlackHole, no setup. On macOS, approve{" "}
                     <span className="text-foreground font-medium">Screen Recording</span>{" "}
-                    the first time, then it just works.
+                    the first time, then it just works. The Mac keeps playing the
+                    sound directly; the phones are the synced satellites.
                   </p>
+                  <div className="border-t border-primary/20 pt-2">
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void enableMacSpeaker()}
+                    >
+                      Use this Mac as a speaker too (in sync)
+                    </Button>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Routes the sound through{" "}
+                      <span className="text-foreground font-medium">BlackHole</span>{" "}
+                      so this Mac can play in sync with the phones. Auto-switches
+                      output and restores it on stop. Needs BlackHole installed
+                      (one-time) — I&apos;ll open the download if it&apos;s missing.
+                    </p>
+                  </div>
                 </div>
               )}
               <p className="text-sm text-muted-foreground">
