@@ -14,10 +14,17 @@ if (!apiKey) {
 }
 
 const PRICE_TL = 500;
+const PAY_BASE = "https://pay.horizonzeta.com";
 const SUCCESS_URL = "https://surround-speaker.expo.app/success.html";
 const FAIL_URL = "https://surround-speaker.expo.app/failed.html";
 
-const client = new PaymentClient({ baseUrl: "https://pay.horizonzeta.com", apiKey });
+const client = new PaymentClient({ baseUrl: PAY_BASE, apiKey });
+
+// The published client's getCheckoutUrl still builds the old "/tr?token=" path
+// (404 on the current pay app). The live checkout is "/?token=...&language=tr".
+function checkoutUrl(token, language = "tr") {
+  return `${PAY_BASE}/?token=${encodeURIComponent(token)}&language=${language}`;
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -41,7 +48,7 @@ const server = http.createServer(async (req, res) => {
         failRedirectUrl: FAIL_URL,
         metadata: { plan: "pro", app: "surround-host" },
       });
-      res.writeHead(302, { Location: client.getCheckoutUrl(token, "tr") });
+      res.writeHead(302, { Location: checkoutUrl(token, "tr") });
       return res.end();
     } catch (e) {
       const msg = e instanceof PaymentClientError ? e.message : "payment error";
