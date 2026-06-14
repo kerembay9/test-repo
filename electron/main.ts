@@ -8,6 +8,7 @@
 // required for audio capture).
 
 import { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage } from "electron";
+import { initMain as initLoopbackAudio } from "electron-audio-loopback";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import http from "node:http";
@@ -15,6 +16,11 @@ import path from "node:path";
 import { networkInterfaces } from "node:os";
 
 const DEFAULT_PORT = 41234;
+
+// Enable native system-audio loopback capture (Spotify etc.) with no BlackHole.
+// Must run before the app is ready — it appends Chromium feature switches and
+// registers the enable/disable IPC the renderer drives via the preload bridge.
+initLoopbackAudio();
 
 let serverProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;

@@ -10,7 +10,10 @@ contextBridge.exposeInMainWorld("surround", {
   platform: process.platform,
   appVersion: process.env.npm_package_version ?? null,
   openExternal: (url: string) => shell.openExternal(url),
-});
 
-// Reserved for future main<->renderer messaging; harmless if unused.
-void ipcRenderer;
+  // Native system-audio loopback (electron-audio-loopback). The renderer wraps
+  // these around its own getDisplayMedia() call (the MediaStream can't cross the
+  // context bridge, so capture must happen in the page).
+  enableLoopbackAudio: () => ipcRenderer.invoke("enable-loopback-audio"),
+  disableLoopbackAudio: () => ipcRenderer.invoke("disable-loopback-audio"),
+});

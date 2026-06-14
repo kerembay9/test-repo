@@ -21,6 +21,18 @@ import {
   type TrackInfo,
 } from "@/lib/sync/types";
 
+// Bridge exposed by the Electron preload (see electron/preload.ts). Undefined
+// in a plain browser.
+type SurroundBridge = {
+  isElectron?: boolean;
+  enableLoopbackAudio?: () => Promise<void>;
+  disableLoopbackAudio?: () => Promise<void>;
+};
+const surroundApi: SurroundBridge | undefined =
+  typeof window !== "undefined"
+    ? (window as unknown as { surround?: SurroundBridge }).surround
+    : undefined;
+
 const BUNDLED_TRACK: TrackInfo = {
   id: "bundled-testsound",
   name: "Test sound",
@@ -103,6 +115,12 @@ export default function HostDashboard() {
   // Local intent to stream, so the host's signaling mailbox opens immediately
   // instead of waiting for the `live` flag to round-trip through a snapshot.
   const [streaming, setStreaming] = useState(false);
+  // Native desktop bridge (preload). Present only in the Electron app; unlocks
+  // one-click system-audio capture. Set in an effect to avoid SSR/hydration skew.
+  const [isElectron, setIsElectron] = useState(false);
+  useEffect(() => {
+    setIsElectron(Boolean(surroundApi?.isElectron));
+  }, []);
   const captureRef = useRef<MediaStream | null>(null);
   const broadcasterRef = useRef<HostBroadcaster | null>(null);
   const onSignal = useCallback((msg: SignalMessage) => {
@@ -303,10 +321,30 @@ export default function HostDashboard() {
   const stop = () => guard(() => sendControl({ action: "stop" }));
   const seek = (pos: number) => guard(() => sendControl({ action: "seek", positionSec: pos }));
 
-  const startLive = (mode: "device" | "tab") =>
+  const startLive = (mode: "device" | "tab" | "loopback") =>
     guard(async () => {
       let stream: MediaStream;
-      if (mode === "tab") {
+      if (mode === "loopback") {
+        // Native system-audio capture via the desktop app (no BlackHole). The
+        // main process answers the display-media request with loopback audio;
+        // we only keep the audio track.
+        if (!surroundApi?.enableLoopbackAudio) {
+          throw new Error("System audio capture is only available in the desktop app.");
+        }
+        await surroundApi.enableLoopbackAudio();
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        } catch (e) {
+          throw new Error(
+            "Couldn't capture system audio. On macOS, allow Screen Recording for Surround in System Settings → Privacy & Security, then retry. (" +
+              (e instanceof Error ? e.message : String(e)) +
+              ")",
+          );
+        } finally {
+          await surroundApi.disableLoopbackAudio?.();
+        }
+        stream.getVideoTracks().forEach((t) => t.stop());
+      } else if (mode === "tab") {
         // Share a tab/window and tick "share audio". Video is discarded.
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
@@ -744,9 +782,21 @@ export default function HostDashboard() {
             </div>
           ) : (
             <>
+              {isElectron && (
+                <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
+                  <Button disabled={busy} onClick={() => void startLive("loopback")}>
+                    Capture this Mac&apos;s audio (Spotify, etc.)
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    One click — no BlackHole, no setup. On macOS, approve{" "}
+                    <span className="text-foreground font-medium">Screen Recording</span>{" "}
+                    the first time, then it just works.
+                  </p>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
-                Send whatever is playing on this Mac (e.g. Spotify) to the
-                phones. Pick a loopback input like{" "}
+                {isElectron ? "Advanced — or " : "Send whatever is playing on this Mac (e.g. Spotify) to the phones. "}
+                pick a loopback input like{" "}
                 <span className="text-foreground font-medium">BlackHole</span>{" "}
                 (route Spotify into it via a macOS Multi-Output Device), or share
                 a browser tab&apos;s audio.

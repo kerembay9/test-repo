@@ -10,6 +10,9 @@ directories:
 files:
   - dist-electron/**/*
   - package.json
+  # main process requires this at runtime (system-audio loopback); the rest of
+  # node_modules is excluded by this allowlist, so include it explicitly.
+  - node_modules/electron-audio-loopback/**/*
 extraResources:
   - from: .next/standalone
     to: standalone
