@@ -98,6 +98,8 @@ export default function HostDashboard() {
   // Label of the input we're actually capturing, so it's obvious whether it's
   // BlackHole or (by mistake) the microphone.
   const [capturedLabel, setCapturedLabel] = useState("");
+  // Which source the host is using; live forces the live panel regardless.
+  const [sourceMode, setSourceMode] = useState<"track" | "live">("track");
   // Local intent to stream, so the host's signaling mailbox opens immediately
   // instead of waiting for the `live` flag to round-trip through a snapshot.
   const [streaming, setStreaming] = useState(false);
@@ -427,35 +429,64 @@ export default function HostDashboard() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-5 space-y-5">
-      <header className="space-y-1">
-        <h1 className="flex items-baseline gap-2">
-          <span className="wordmark-strong text-3xl text-foreground">SURROUND</span>
-          <span className="wordmark-thin text-xl text-primary">HOST</span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Play a track here and turn every nearby phone into a synchronized
-          satellite speaker.{" "}
-          <span
-            className={
-              connected ? "font-medium text-[var(--live)]" : "text-destructive"
-            }
-          >
-            {connected ? "● live" : "○ connecting…"}
-          </span>
-        </p>
+    <div className="max-w-5xl mx-auto p-5 lg:p-8">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="flex items-baseline gap-2">
+            <span className="wordmark-strong text-3xl text-foreground">SURROUND</span>
+            <span className="wordmark-thin text-xl text-primary">HOST</span>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Play here; the phones around you become synchronized speakers.
+          </p>
+        </div>
+        <span
+          className={`text-sm font-medium ${connected ? "text-[var(--live)]" : "text-destructive"}`}
+        >
+          {connected ? "● live" : "○ connecting…"}
+        </span>
       </header>
 
       {err && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">1 · Choose a track</CardTitle>
-        </CardHeader>
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
+        <div className="space-y-5">
+          <div className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
+            <button
+              type="button"
+              disabled={live}
+              onClick={() => setSourceMode("track")}
+              className={`rounded-md px-4 py-1.5 font-medium transition-colors ${
+                !live && sourceMode === "track"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              } ${live ? "opacity-40" : ""}`}
+            >
+              Play a track
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceMode("live")}
+              className={`rounded-md px-4 py-1.5 font-medium transition-colors ${
+                live || sourceMode === "live"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Stream this Mac
+            </button>
+          </div>
+
+          {!live && sourceMode === "track" ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Choose a track</CardTitle>
+                </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" disabled={busy} onClick={() => chooseTrack(BUNDLED_TRACK)}>
@@ -499,7 +530,7 @@ export default function HostDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">2 · Playback</CardTitle>
+          <CardTitle className="text-base">Playback</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
@@ -574,15 +605,14 @@ export default function HostDashboard() {
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            2½ · Stream live audio (Spotify / system)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {live ? (
+            </>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Stream this Mac (Spotify / system audio)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {live ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm">
@@ -605,8 +635,12 @@ export default function HostDashboard() {
                 </p>
               )}
 
-              <div className="rounded-md border p-3 space-y-3">
-                <p className="text-sm font-medium">Delay this Mac to match phones</p>
+              <details className="rounded-md border">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium">
+                  <span>Align this Mac with the phones</span>
+                  <span className="text-xs text-muted-foreground">optional</span>
+                </summary>
+                <div className="space-y-3 border-t border-border p-3">
                 <p className="text-xs text-muted-foreground">
                   Phones lag by WebRTC&apos;s buffer, so this Mac sounds early. To
                   delay it, the app plays the captured audio to your real speakers
@@ -705,7 +739,8 @@ export default function HostDashboard() {
                     </p>
                   </>
                 )}
-              </div>
+                </div>
+              </details>
             </div>
           ) : (
             <>
@@ -757,13 +792,19 @@ export default function HostDashboard() {
               </p>
             </>
           )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">3 · Add speakers</CardTitle>
-        </CardHeader>
+        <aside className="space-y-5 lg:sticky lg:top-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Add speakers</CardTitle>
+              <span className="text-sm text-muted-foreground">
+                {speakers.length} connected
+              </span>
+            </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Open the <span className="text-foreground font-medium">Surround
@@ -799,15 +840,17 @@ export default function HostDashboard() {
                     key={s.id}
                     className="flex items-center gap-2 text-sm rounded-md border px-3 py-2"
                   >
-                    <span className="size-2 rounded-full bg-green-500" />
+                    <span className="size-2 rounded-full bg-[var(--live)]" />
                     {s.name}
                   </li>
                 ))}
               </ul>
             )}
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }
