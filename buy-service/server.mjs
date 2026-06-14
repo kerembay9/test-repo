@@ -13,7 +13,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const PRICE_TL = 500;
+const PRICE_TL = 600;
 const PAY_BASE = "https://pay.horizonzeta.com";
 const SUCCESS_URL = "https://surround-speaker.expo.app/success.html";
 const FAIL_URL = "https://surround-speaker.expo.app/failed.html";

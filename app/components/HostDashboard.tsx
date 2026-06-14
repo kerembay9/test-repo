@@ -609,21 +609,20 @@ export default function HostDashboard() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-5 lg:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="flex items-baseline gap-2">
-            <span className="wordmark-strong text-3xl text-foreground">SURROUND</span>
-            <span className="wordmark-thin text-xl text-primary">HOST</span>
+    <div className="max-w-6xl mx-auto px-5 py-7 lg:px-8 lg:py-10">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] pb-6">
+        <div className="space-y-1.5">
+          <h1 className="flex items-baseline gap-2.5">
+            <span className="wordmark-strong text-3xl sm:text-4xl text-foreground">SURROUND</span>
+            <span className="wordmark-thin text-lg sm:text-xl text-primary">HOST</span>
           </h1>
           <p className="text-sm text-muted-foreground">
-            Play here; the phones around you become synchronized speakers.
+            The phones around you become one synchronized speaker.
           </p>
         </div>
-        <span
-          className={`text-sm font-medium ${connected ? "text-[var(--live)]" : "text-destructive"}`}
-        >
-          {connected ? "● live" : "○ connecting…"}
+        <span className="status-pill" data-live={connected}>
+          <span className="status-dot" />
+          {connected ? "Live" : "Connecting…"}
         </span>
       </header>
 
@@ -633,7 +632,7 @@ export default function HostDashboard() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="space-y-5">
           <div className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
             <button
@@ -1090,26 +1089,37 @@ export default function HostDashboard() {
 
           {/* Plan / license (desktop host only). */}
           {license && (
-            <div className="border-t pt-4">
+            <div className="border-t border-white/[0.06] pt-5">
               {license.licensed ? (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                <div className="flex items-center gap-2.5 text-sm">
+                  <span className="status-pill" data-live="true">
+                    <span className="status-dot" />
                     Surround Pro
                   </span>
                   <span className="text-muted-foreground">Unlimited speakers</span>
                 </div>
               ) : (
-                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
-                  <p className="text-sm font-medium">
-                    Free plan — up to {license.freeLimit} phones
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Add unlimited speakers for{" "}
-                    <span className="font-medium text-foreground">500 TL</span> —
-                    one-time, lifetime, no subscription.
-                  </p>
+                <div className="panel-pro space-y-3.5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="wordmark text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        Surround Pro
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Free covers {license.freeLimit} phones. Go unlimited.
+                      </p>
+                    </div>
+                    <div className="text-right leading-none">
+                      <div className="wordmark-strong text-2xl text-foreground tabular-nums">
+                        600<span className="ml-1 text-base font-normal text-muted-foreground">TL</span>
+                      </div>
+                      <div className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
+                        KDV dahil · tek seferlik
+                      </div>
+                    </div>
+                  </div>
                   <Button
-                    size="sm"
+                    className="w-full shadow-[0_10px_30px_-12px_var(--primary)]"
                     onClick={() => {
                       // Hosted endpoint (EC2) creates a session and redirects to
                       // the PayTR checkout; the API key stays on the server.
@@ -1117,14 +1127,14 @@ export default function HostDashboard() {
                       else window.open(BUY_URL, "_blank");
                     }}
                   >
-                    Buy — 500 TL
+                    Get Pro — unlock every phone
                   </Button>
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex items-center gap-2">
                     <input
                       value={licenseKey}
                       onChange={(e) => setLicenseKey(e.target.value)}
-                      placeholder="Paste license key"
-                      className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5 text-sm"
+                      placeholder="Already have a key?"
+                      className="min-w-0 flex-1 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
                     />
                     <Button
                       size="sm"

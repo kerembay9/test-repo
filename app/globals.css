@@ -125,16 +125,86 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Faint sound-field glow: warm signal at top, cool depth below. */
+    /* Layered sound-field atmosphere: a warm coral aura up top, a cool mint
+       breath off to one side, and a depth gradient settling into the field. */
     background-image:
       radial-gradient(
-        110% 60% at 50% -10%,
-        color-mix(in srgb, var(--primary) 9%, transparent),
+        90% 55% at 50% -12%,
+        color-mix(in srgb, var(--primary) 13%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        50% 40% at 88% 8%,
+        color-mix(in srgb, var(--live) 7%, transparent),
         transparent 60%
       ),
-      linear-gradient(180deg, #10132a 0%, var(--background) 38%);
+      linear-gradient(180deg, #10132a 0%, var(--background) 42%);
     background-attachment: fixed;
+    position: relative;
   }
+  /* Fine film grain over the whole field for tactile, non-flat depth. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* Keep app content above the grain layer. */
+  body > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* Live/connection status pill. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.3rem 0.75rem 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+.status-pill[data-live="true"] {
+  border-color: color-mix(in srgb, var(--live) 45%, transparent);
+  color: var(--live);
+}
+.status-pill[data-live="false"] {
+  color: var(--muted-foreground);
+}
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+}
+.status-pill[data-live="true"] .status-dot {
+  animation: status-ping 2s ease-out infinite;
+}
+@keyframes status-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Coral-lit panel for the Pro upgrade — the one moment of warm emphasis. */
+.panel-pro {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
+  background:
+    radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 60%),
+    color-mix(in srgb, var(--primary) 5%, var(--card));
+  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
 /* Sonar sound-field: rings expanding from a node, the brand signature. */
