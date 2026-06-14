@@ -15,6 +15,20 @@
 import type { ChannelRole, Transport } from "./types";
 import type { ClockSync } from "./clock";
 
+// iOS/iPadOS Safari: createMediaStreamSource on a remote WebRTC stream is
+// silent, so live audio is played from an <audio> element instead. iPadOS 13+
+// reports as "Macintosh", so also sniff touch support.
+function isIOSDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return (
+    /iP(hone|od|ad)/.test(ua) ||
+    (/Macintosh/.test(ua) &&
+      typeof document !== "undefined" &&
+      "ontouchend" in document)
+  );
+}
+
 const DRIFT_NUDGE_THRESHOLD = 0.02; // 20 ms: start gently correcting
 const DRIFT_RESEEK_THRESHOLD = 0.25; // 250 ms: too far off, hard re-seek
 const MAX_RATE_TRIM = 0.03; // clamp playbackRate to [0.97, 1.03]
@@ -35,6 +49,11 @@ export class AudioEngine {
   // Muted keep-alive element: Chrome won't pull a remote WebRTC stream through
   // Web Audio alone, so an attached HTMLMediaElement is needed to flow the track.
   private sinkEl: HTMLAudioElement | null = null;
+  // On iOS, createMediaStreamSource on a *remote* WebRTC stream is silent (a
+  // long-standing WebKit bug), so live audio is played straight from the
+  // <audio> element instead of the Web Audio graph. Role/delay-trim don't apply
+  // in this mode, but the phone actually makes sound. Volume is set on the el.
+  private elementMode = false;
 
   // Static routing graph: source -> splitter -> merger -> delay -> gain -> out
   private splitter: ChannelSplitterNode;
@@ -116,11 +135,23 @@ export class AudioEngine {
     this.stopSource(); // never run the file source and a live stream together
 
     const sink = new Audio();
-    sink.muted = true; // routed through Web Audio; the element only flows bytes
+    sink.setAttribute("playsinline", "");
     sink.srcObject = stream;
-    void sink.play().catch(() => {});
     this.sinkEl = sink;
 
+    if (isIOSDevice()) {
+      // WebKit can't route a remote stream through Web Audio, so play it from
+      // the element directly. Lose role/delay processing, but get sound.
+      this.elementMode = true;
+      sink.muted = false;
+      sink.volume = this.volume;
+      void sink.play().catch(() => {});
+      void this.ctx.resume();
+      return;
+    }
+
+    sink.muted = true; // routed through Web Audio; the element only flows bytes
+    void sink.play().catch(() => {});
     this.streamSrc = this.ctx.createMediaStreamSource(stream);
     this.channels = 2; // remote opus audio is delivered as stereo
     this.wireRole();
@@ -147,6 +178,7 @@ export class AudioEngine {
       this.sinkEl.srcObject = null;
       this.sinkEl = null;
     }
+    this.elementMode = false;
   }
 
   setRole(role: ChannelRole): void {
@@ -157,6 +189,8 @@ export class AudioEngine {
   setVolume(v: number): void {
     this.volume = clamp(v, 0, 1);
     this.gain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.02);
+    // In element mode (iOS live) the graph is bypassed; set the element volume.
+    if (this.elementMode && this.sinkEl) this.sinkEl.volume = this.volume;
   }
 
   /** Manual per-speaker delay trim (ms) for fine surround alignment. */
