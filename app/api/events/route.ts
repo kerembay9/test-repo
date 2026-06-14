@@ -7,9 +7,12 @@ import {
   addSubscriber,
   broadcast,
   getSnapshot,
+  hasSpeaker,
   registerSpeaker,
   removeSpeaker,
+  speakerCount,
 } from "@/lib/sync/server-store";
+import { licenseStatus } from "@/lib/sync/license";
 import type { Snapshot } from "@/lib/sync/types";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +28,7 @@ export async function GET(req: Request) {
   const encoder = new TextEncoder();
   let unsubscribe = () => {};
   let ping: ReturnType<typeof setInterval> | undefined;
+  let registered = false;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -33,7 +37,16 @@ export async function GET(req: Request) {
       };
 
       if (isSpeaker) {
+        // Freemium cap: free hosts allow up to `freeLimit` speakers. Turn away
+        // any new phone beyond that until the host activates a license.
+        const { licensed, freeLimit } = licenseStatus();
+        if (!licensed && !hasSpeaker(id) && speakerCount() >= freeLimit) {
+          send({ ...getSnapshot(), rejected: "limit" });
+          controller.close();
+          return;
+        }
         registerSpeaker(id, name);
+        registered = true;
         broadcast(); // tell everyone a new speaker joined
       }
 
@@ -52,7 +65,7 @@ export async function GET(req: Request) {
     cancel() {
       unsubscribe();
       if (ping) clearInterval(ping);
-      if (isSpeaker) {
+      if (registered) {
         removeSpeaker(id);
         broadcast();
       }

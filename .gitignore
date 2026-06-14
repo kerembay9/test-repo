@@ -47,3 +47,6 @@ next-env.d.ts
 # eas deploy export artifacts
 mobile/legal-dist/.eas*
 mobile/dist/
+
+# license signing key — secret, never commit
+/licensing/private-key.pem

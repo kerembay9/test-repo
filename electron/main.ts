@@ -97,6 +97,8 @@ function startServer(port: number): Promise<void> {
       // Bind all interfaces so phones on the LAN can connect; the window
       // itself still loads via localhost for a secure context.
       HOSTNAME: "0.0.0.0",
+      // Where the server persists/reads the Pro license (freemium speaker cap).
+      SURROUND_LICENSE_PATH: path.join(app.getPath("userData"), "license.key"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

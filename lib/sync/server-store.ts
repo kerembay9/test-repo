@@ -105,6 +105,14 @@ export function registerSpeaker(id: string, name: string): void {
   store.speakers.set(id, { id, name, connected: true, lastSeen: Date.now() });
 }
 
+export function speakerCount(): number {
+  return store.speakers.size;
+}
+
+export function hasSpeaker(id: string): boolean {
+  return store.speakers.has(id);
+}
+
 export function touchSpeaker(
   id: string,
   name?: string,

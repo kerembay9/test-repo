@@ -206,6 +206,23 @@ export default function SpeakerPage() {
   const track = snapshot?.transport.track;
   const isPlaying = snapshot?.transport.isPlaying ?? false;
 
+  // Host turned us away — free plan speaker limit reached.
+  if (snapshot?.rejected === "limit") {
+    return (
+      <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="flex items-baseline justify-center gap-2">
+          <span className="wordmark-strong text-2xl text-foreground">SURROUND</span>
+          <span className="wordmark-thin text-base text-primary">SPEAKER</span>
+        </div>
+        <h1 className="text-lg font-semibold pt-2">This room is full</h1>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          The host is on the free plan, which allows a limited number of phones.
+          Ask the host to upgrade to Surround Pro to add more speakers.
+        </p>
+      </main>
+    );
+  }
+
   if (!joined) {
     return (
       <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-6 p-6">

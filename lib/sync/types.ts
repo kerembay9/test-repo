@@ -61,6 +61,8 @@ export interface Snapshot {
   speakers: Speaker[];
   /** Server epoch (ms) at the moment the snapshot was produced. */
   serverTime: number;
+  /** Set on a connection the host turned away (e.g. free speaker limit). */
+  rejected?: "limit";
 }
 
 /** Compute the playback position (seconds) for a given server time. */

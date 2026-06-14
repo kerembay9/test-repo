@@ -33,6 +33,9 @@ type SurroundBridge = {
   audioSetOutput?: (name: string) => Promise<string>;
 };
 const BLACKHOLE_URL = "https://existential.audio/blackhole/";
+// Where the "Buy" button sends the host to purchase a Pro license. Swap for the
+// real horizon-pay checkout once the payment→key-delivery flow is wired.
+const BUY_URL = "https://pay.horizonzeta.com/surround-pro";
 const surroundApi: SurroundBridge | undefined =
   typeof window !== "undefined"
     ? (window as unknown as { surround?: SurroundBridge }).surround
@@ -77,6 +80,10 @@ export default function HostDashboard() {
   const [scrubbing, setScrubbing] = useState<number | null>(null);
   const [joinUrl, setJoinUrl] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  // Freemium plan state (desktop host). Free hosts cap the speaker count.
+  const [license, setLicense] = useState<{ licensed: boolean; freeLimit: number } | null>(null);
+  const [licenseKey, setLicenseKey] = useState("");
+  const [licenseMsg, setLicenseMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // The host machine also plays the audio, so it's the main stereo pair.
@@ -218,6 +225,42 @@ export default function HostDashboard() {
   useEffect(() => {
     void refreshNetwork(false);
   }, [refreshNetwork]);
+
+  // License/plan status (desktop host; web hosts report free with no path).
+  const refreshLicense = useCallback(async () => {
+    try {
+      setLicense((await (await fetch("/api/license")).json()) as {
+        licensed: boolean;
+        freeLimit: number;
+      });
+    } catch {
+      /* leave as-is */
+    }
+  }, []);
+  useEffect(() => {
+    void refreshLicense();
+  }, [refreshLicense]);
+
+  const activateLicense = async () => {
+    setLicenseMsg(null);
+    try {
+      const r = await fetch("/api/license", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: licenseKey.trim() }),
+      });
+      if (r.ok) {
+        setLicense((await r.json()) as { licensed: boolean; freeLimit: number });
+        setLicenseKey("");
+        setLicenseMsg("Activated — Surround Pro unlocked. Unlimited speakers.");
+      } else {
+        const e = (await r.json().catch(() => ({}))) as { error?: string };
+        setLicenseMsg(e.error ?? "Invalid license key.");
+      }
+    } catch {
+      setLicenseMsg("Couldn't reach the host to activate.");
+    }
+  };
 
   // Keep the scrub bar moving while playing.
   useEffect(() => {
@@ -1035,6 +1078,60 @@ export default function HostDashboard() {
               </ul>
             )}
           </div>
+
+          {/* Plan / license (desktop host only). */}
+          {license && (
+            <div className="border-t pt-4">
+              {license.licensed ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                    Surround Pro
+                  </span>
+                  <span className="text-muted-foreground">Unlimited speakers</span>
+                </div>
+              ) : (
+                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <p className="text-sm font-medium">
+                    Free plan — up to {license.freeLimit} phones
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Add unlimited speakers for{" "}
+                    <span className="font-medium text-foreground">500 TL</span> —
+                    one-time, lifetime, no subscription.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      surroundApi?.openExternal
+                        ? surroundApi.openExternal(BUY_URL)
+                        : window.open(BUY_URL, "_blank")
+                    }
+                  >
+                    Buy — 500 TL
+                  </Button>
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      value={licenseKey}
+                      onChange={(e) => setLicenseKey(e.target.value)}
+                      placeholder="Paste license key"
+                      className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!licenseKey.trim()}
+                      onClick={() => void activateLicense()}
+                    >
+                      Activate
+                    </Button>
+                  </div>
+                  {licenseMsg && (
+                    <p className="text-xs text-muted-foreground">{licenseMsg}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
             </CardContent>
           </Card>
         </aside>
