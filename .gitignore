@@ -43,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# eas deploy export artifacts
+mobile/legal-dist/.eas*
+mobile/dist/

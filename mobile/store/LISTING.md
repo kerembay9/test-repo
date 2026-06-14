@@ -43,5 +43,7 @@ synchronized audio, multi-room, surround sound, speaker, party, Wi-Fi audio
 kerembayramoglu@horizonzeta.com
 
 ## Privacy policy URL
-(host PRIVACY.md somewhere public and paste the URL here —
-e.g. add a /privacy page to the Surround landing site)
+https://surround-speaker.expo.app/privacy.html
+
+## Terms of service URL
+https://surround-speaker.expo.app/terms.html
