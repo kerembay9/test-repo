@@ -33,6 +33,9 @@ type SurroundBridge = {
   audioSetOutput?: (name: string) => Promise<string>;
 };
 const BLACKHOLE_URL = "https://existential.audio/blackhole/";
+// Hosted buy endpoint (EC2): creates a 500 TL horizon-pay session and redirects
+// to checkout. Keeps the API key server-side, off every client.
+const BUY_URL = "https://pay.horizonzeta.com/surround-buy/buy";
 const surroundApi: SurroundBridge | undefined =
   typeof window !== "undefined"
     ? (window as unknown as { surround?: SurroundBridge }).surround
@@ -1099,11 +1102,10 @@ export default function HostDashboard() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      // Same-origin endpoint creates a session and redirects to
-                      // the PayTR checkout; opens in the system browser.
-                      const url = `${window.location.origin}/api/buy`;
-                      if (surroundApi?.openExternal) surroundApi.openExternal(url);
-                      else window.open(url, "_blank");
+                      // Hosted endpoint (EC2) creates a session and redirects to
+                      // the PayTR checkout; the API key stays on the server.
+                      if (surroundApi?.openExternal) surroundApi.openExternal(BUY_URL);
+                      else window.open(BUY_URL, "_blank");
                     }}
                   >
                     Buy — 500 TL
