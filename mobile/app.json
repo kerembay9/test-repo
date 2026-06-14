@@ -2,6 +2,7 @@
   "expo": {
     "name": "Surround Speaker",
     "slug": "surround-speaker",
+    "owner": "horizonzeta",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,7 +18,9 @@
         "NSCameraUsageDescription": "Scan a host's QR code to join its speaker group.",
         "NSMicrophoneUsageDescription": "Used only if the host requests a live two-way audio session; this app plays back synchronized audio.",
         "NSLocalNetworkUsageDescription": "Finds and connects to the host computer on your local Wi-Fi to receive synchronized audio.",
-        "NSBonjourServices": ["_surround._tcp"],
+        "NSBonjourServices": [
+          "_surround._tcp"
+        ],
         "UIBackgroundModes": [
           "audio"
         ],
@@ -45,7 +48,8 @@
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.RECORD_AUDIO"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
@@ -84,6 +88,11 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a36341b1-843c-47fa-829f-3634a0d483b6"
+      }
     }
   }
 }
