@@ -25,6 +25,16 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./credentials/play-service-account.json",
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "kerembayramoglu@horizonzeta.com",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "723DPNZ9F4"
+      }
+    }
   }
 }
