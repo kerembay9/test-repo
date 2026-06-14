@@ -141,7 +141,9 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.loadURL(`http://localhost:${serverPort}/`);
+  // Open the host dashboard directly (the app's purpose); `/` is the public
+  // marketing landing page. Phones still get `/speaker`.
+  mainWindow.loadURL(`http://localhost:${serverPort}/host`);
 
   // Close hides to tray instead of quitting (menu-bar-app feel).
   mainWindow.on("close", (e) => {
