@@ -1033,25 +1033,34 @@ export default function HostDashboard() {
               </div>
             </div>
           )}
-          <div className="flex gap-2">
-            <code className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-sm break-all">
+          <div className="space-y-2">
+            <code className="block w-full rounded-md border bg-muted/40 px-3 py-2 text-sm break-all">
               {joinUrl || "…"}
             </code>
-            <Button variant="outline" onClick={() => void copyJoin()}>
-              {copied ? "Copied" : "Copy"}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={refreshing}
-              onClick={() => {
-                setRefreshing(true);
-                void refreshNetwork(true).finally(() =>
-                  setTimeout(() => setRefreshing(false), 600),
-                );
-              }}
-            >
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={() => void copyJoin()}
+              >
+                {copied ? "Copied" : "Copy link"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                disabled={refreshing}
+                onClick={() => {
+                  setRefreshing(true);
+                  void refreshNetwork(true).finally(() =>
+                    setTimeout(() => setRefreshing(false), 600),
+                  );
+                }}
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </Button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             Changed Wi-Fi or hotspot? Tap{" "}
