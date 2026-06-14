@@ -137,6 +137,30 @@
   }
 }
 
+/* Sonar sound-field: rings expanding from a node, the brand signature. */
+@keyframes field-ping {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.field-ring {
+  animation: field-ping 4.4s cubic-bezier(0.2, 0.6, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-ring {
+    animation: none;
+    opacity: 0.1;
+  }
+}
+
 /* Wordmark: heavy display weight over a wide-tracked light second word. */
 .wordmark {
   font-family: var(--font-display);

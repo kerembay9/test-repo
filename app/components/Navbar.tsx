@@ -12,7 +12,7 @@ export default function Navbar() {
         </span>
       </Link>
       <div className="flex items-center gap-4 text-sm">
-        <Link href="/" className="text-muted-foreground transition-colors hover:text-foreground">
+        <Link href="/host" className="text-muted-foreground transition-colors hover:text-foreground">
           Host
         </Link>
         <Link href="/speaker" className="text-muted-foreground transition-colors hover:text-foreground">
