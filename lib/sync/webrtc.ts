@@ -111,6 +111,12 @@ export class HostBroadcaster {
   }
 }
 
+// Target playout buffer for the receiver's NetEq, in ms. The default adaptive
+// buffer inflates badly on jittery links (a phone hotspot can hit 300ms+);
+// pinning a lower target trades a bit of dropout tolerance for much less lag.
+// ~120ms is a good middle ground; raise it if a flaky network glitches.
+const DEFAULT_JITTER_TARGET_MS = 120;
+
 /** Speaker side: answers the host's offer and surfaces the incoming stream. */
 export class SpeakerReceiver {
   private peer: Peer | null = null;
@@ -119,6 +125,7 @@ export class SpeakerReceiver {
     private hostId: string,
     private send: SignalSend,
     private onStream: (stream: MediaStream) => void,
+    private jitterTargetMs: number = DEFAULT_JITTER_TARGET_MS,
   ) {}
 
   private ensure(): Peer {
@@ -129,6 +136,15 @@ export class SpeakerReceiver {
       if (e.candidate) this.send(this.hostId, "ice", e.candidate.toJSON());
     };
     pc.ontrack = (e) => {
+      // Cap the jitter buffer so playout doesn't lag hundreds of ms. Newer
+      // Chromium uses jitterBufferTarget (ms); older exposes playoutDelayHint (s).
+      try {
+        const r = e.receiver as unknown as Record<string, unknown>;
+        if ("jitterBufferTarget" in r) r.jitterBufferTarget = this.jitterTargetMs;
+        else r.playoutDelayHint = this.jitterTargetMs / 1000;
+      } catch {
+        /* best-effort; unsupported browsers keep the adaptive default */
+      }
       this.onStream(e.streams[0] ?? new MediaStream([e.track]));
     };
     this.peer = peer;
