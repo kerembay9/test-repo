@@ -6,8 +6,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-live: var(--live);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-bricolage);
+  --font-mono: var(--font-inter);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -43,39 +45,44 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Surround "sound field" identity: deep indigo field, warm coral signal, mint
+   reserved for the live/connected state. Dark by default — there is no light
+   theme; the field is the brand. */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: dark;
+  --radius: 0.875rem;
+  --background: #0a0c16;
+  --foreground: #eef0fb;
+  --card: #12162a;
+  --card-foreground: #eef0fb;
+  --popover: #161a2c;
+  --popover-foreground: #eef0fb;
+  --primary: #ff8a4c;
+  --primary-foreground: #1a0e06;
+  --secondary: #1b2138;
+  --secondary-foreground: #eef0fb;
+  --muted: #161a2c;
+  --muted-foreground: #888fb5;
+  --accent: #1b2138;
+  --accent-foreground: #eef0fb;
+  --destructive: #ff6b6b;
+  --border: #2a3050;
+  --input: #2a3050;
+  --ring: #ff8a4c;
+  --live: #6be5d8;
+  --chart-1: #ff8a4c;
+  --chart-2: #6be5d8;
+  --chart-3: #888fb5;
+  --chart-4: #ffb347;
+  --chart-5: #5b8def;
+  --sidebar: #12162a;
+  --sidebar-foreground: #eef0fb;
+  --sidebar-primary: #ff8a4c;
+  --sidebar-primary-foreground: #1a0e06;
+  --sidebar-accent: #1b2138;
+  --sidebar-accent-foreground: #eef0fb;
+  --sidebar-border: #2a3050;
+  --sidebar-ring: #ff8a4c;
 }
 
 .dark {
@@ -118,5 +125,29 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Faint sound-field glow: warm signal at top, cool depth below. */
+    background-image:
+      radial-gradient(
+        110% 60% at 50% -10%,
+        color-mix(in srgb, var(--primary) 9%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(180deg, #10132a 0%, var(--background) 38%);
+    background-attachment: fixed;
   }
+}
+
+/* Wordmark: heavy display weight over a wide-tracked light second word. */
+.wordmark {
+  font-family: var(--font-display);
+}
+.wordmark-strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.wordmark-thin {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: 0.35em;
 }

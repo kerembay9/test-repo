@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The Expo app under mobile/ is a separate project with its own toolchain.
     "mobile/**",
+    // The Electron shell (Node/CommonJS) isn't part of the Next web lint.
+    "electron/**",
+    "dist-electron/**",
   ]),
 ]);
 

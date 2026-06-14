@@ -429,11 +429,18 @@ export default function HostDashboard() {
   return (
     <div className="max-w-2xl mx-auto p-5 space-y-5">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Surround Host</h1>
+        <h1 className="flex items-baseline gap-2">
+          <span className="wordmark-strong text-3xl text-foreground">SURROUND</span>
+          <span className="wordmark-thin text-xl text-primary">HOST</span>
+        </h1>
         <p className="text-sm text-muted-foreground">
           Play a track here and turn every nearby phone into a synchronized
           satellite speaker.{" "}
-          <span className={connected ? "text-foreground" : "text-destructive"}>
+          <span
+            className={
+              connected ? "font-medium text-[var(--live)]" : "text-destructive"
+            }
+          >
             {connected ? "● live" : "○ connecting…"}
           </span>
         </p>

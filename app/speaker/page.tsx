@@ -210,7 +210,11 @@ export default function SpeakerPage() {
     return (
       <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-6 p-6">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Join as a Speaker</h1>
+          <div className="flex items-baseline justify-center gap-2">
+            <span className="wordmark-strong text-2xl text-foreground">SURROUND</span>
+            <span className="wordmark-thin text-base text-primary">SPEAKER</span>
+          </div>
+          <h1 className="text-lg font-semibold pt-2">Join as a speaker</h1>
           <p className="text-muted-foreground max-w-sm">
             Tap below to add this device to the surround system. Your browser
             needs a tap before it can play audio.
