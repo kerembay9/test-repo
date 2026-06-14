@@ -1,0 +1,47 @@
+appId: com.surround.app
+productName: Surround
+directories:
+  buildResources: electron/build-resources
+  output: dist
+
+# Pack only the Electron glue into the app; the Next.js server ships separately
+# as an extraResource (it must stay on disk, not inside the asar, so a child
+# Node process can require its bundled modules).
+files:
+  - dist-electron/**/*
+  - package.json
+extraResources:
+  - from: .next/standalone
+    to: standalone
+
+asar: true
+
+mac:
+  category: public.app-category.music
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: electron/build-resources/entitlements.mac.plist
+  entitlementsInherit: electron/build-resources/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: >-
+      Surround captures audio on this Mac to stream it, in sync, to the phones
+      acting as satellite speakers.
+
+# Notarization runs only when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
+# APPLE_TEAM_ID are present in the environment; otherwise the build is unsigned.
+afterSign: electron/build-resources/notarize.js
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

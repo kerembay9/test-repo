@@ -2,11 +2,20 @@
   "name": "surround",
   "version": "0.1.0",
   "private": true,
+  "description": "Turn nearby phones and laptops into synchronized satellite speakers.",
+  "author": "Surround",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:next": "next build && node electron/build-resources/copy-standalone.mjs",
+    "build:electron": "tsc -p tsconfig.electron.json && node -e \"require('fs').cpSync('electron/build-resources/trayTemplate.png','dist-electron/trayTemplate.png')\"",
+    "electron:dev": "npm run build:next && npm run build:electron && electron .",
+    "dist": "npm run build:next && npm run build:electron && electron-builder",
+    "dist:mac": "npm run build:next && npm run build:electron && electron-builder --mac",
+    "dist:win": "npm run build:next && npm run build:electron && electron-builder --win"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -25,6 +34,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@electron/notarize": "^2.5.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "tailwindcss": "^4",
