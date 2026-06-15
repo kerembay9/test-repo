@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Turn nearby phones and laptops into synchronized satellite speakers.",
-  "author": "Surround",
+  "author": {
+    "name": "Surround",
+    "email": "kerembayramoglu@horizonzeta.com"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
@@ -15,7 +18,9 @@
     "electron:dev": "npm run build:next && npm run build:electron && electron .",
     "dist": "npm run build:next && npm run build:electron && electron-builder",
     "dist:mac": "npm run build:next && npm run build:electron && electron-builder --mac",
-    "dist:win": "npm run build:next && npm run build:electron && electron-builder --win"
+    "dist:win": "npm run build:next && npm run build:electron && electron-builder --win",
+    "dist:linux": "npm run build:next && npm run build:electron && electron-builder --linux",
+    "dist:all": "npm run build:next && npm run build:electron && electron-builder --mac --win --linux"
   },
   "dependencies": {
     "@kerembay9/horizon-pay": "^1.0.11",

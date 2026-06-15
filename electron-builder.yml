@@ -55,3 +55,12 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+
+linux:
+  artifactName: ${productName}-linux-${arch}.${ext}
+  category: Audio
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]

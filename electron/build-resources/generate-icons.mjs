@@ -76,12 +76,13 @@ function sdRoundRect(x, y, cx, cy, half, r) {
 }
 
 /* ---------- the mark ---------- */
-// Brand palette (violet) on near-black, with a luminous center.
-const BG_TOP = [0x16, 0x10, 0x2a];   // deep violet-tinted dark
-const BG_BOT = [0x08, 0x08, 0x0c];   // near black
-const RING = [0x8b, 0x5c, 0xf6];     // violet-500
-const CORE = [0xede, 0xe9, 0xfe].map((v) => Math.min(v, 255)); // light violet
-const CORE_C = [0xed, 0xe9, 0xfe];
+// Brand palette matched to the Android app icon: a luminous orange center
+// source radiating orange rings over a deep navy field.
+const BG_TOP = [0x10, 0x13, 0x2a];   // deep navy
+const BG_BOT = [0x0d, 0x0f, 0x20];   // near-black navy
+const RING = [0xf2, 0x8a, 0x4e];     // warm orange stroke
+const CORE = [0xff, 0x8a, 0x4c];     // bright orange
+const CORE_C = [0xff, 0x8a, 0x4c];
 
 function paintIcon(size) {
   const s = size;
@@ -90,8 +91,8 @@ function paintIcon(size) {
   const half = c - margin;
   const radius = s * 0.225;          // macOS-ish squircle corner
   const aa = s / 256;                // ~1px feather scaled to resolution
-  // ring geometry as fractions of half-size
-  const rings = [0.34, 0.56, 0.78].map((f) => f * half);
+  // ring geometry as fractions of half-size (four rings, matching Android mark)
+  const rings = [0.30, 0.50, 0.70, 0.90].map((f) => f * half);
   const ringW = s * 0.018;
 
   return (x, y) => {
@@ -120,9 +121,10 @@ function paintIcon(size) {
       if (a > 0) col = over(col, [RING[0], RING[1], RING[2], a]);
     }
 
-    // luminous center source
-    const coreR = half * 0.12;
-    const coreA = Math.min(1, band(d - 0, coreR * 1.2) ** 2 + band(d, coreR * 3) * 0.25);
+    // luminous center source — a bold filled orange dot with a soft halo
+    const coreR = half * 0.14;
+    const solid = 1 - Math.min(Math.max((d - coreR + aa) / (2 * aa), 0), 1); // crisp disc
+    const coreA = Math.min(1, solid + band(d, coreR * 3) * 0.3);
     if (coreA > 0) col = over(col, [CORE_C[0], CORE_C[1], CORE_C[2], coreA]);
 
     return [clamp(col[0]), clamp(col[1]), clamp(col[2]), clamp(inside * 255)];

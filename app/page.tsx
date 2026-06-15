@@ -47,6 +47,8 @@ const DOWNLOADS = [
   { label: "macOS — Apple Silicon", file: "Surround-mac-arm64.dmg", primary: true },
   { label: "macOS — Intel", file: "Surround-mac-x64.dmg", primary: false },
   { label: "Windows", file: "Surround-windows-x64.exe", primary: false },
+  { label: "Linux — AppImage", file: "Surround-linux-x86_64.AppImage", primary: false },
+  { label: "Linux — .deb", file: "Surround-linux-amd64.deb", primary: false },
 ];
 
 function SoundField() {
@@ -175,7 +177,7 @@ export default function Landing() {
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
           The host plays the music and keeps every phone in sync. Download the
-          desktop app for macOS or Windows — no terminal, no setup.
+          desktop app for macOS, Windows, or Linux — no terminal, no setup.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {DOWNLOADS.map((d) => (
@@ -191,8 +193,8 @@ export default function Landing() {
           ))}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          macOS 10.12+ · Windows 10+. The app runs the host server locally;
-          phones join from the same Wi-Fi.
+          macOS 10.12+ · Windows 10+ · Linux (x64). The app runs the host server
+          locally; phones join from the same Wi-Fi.
         </p>
       </section>
 
