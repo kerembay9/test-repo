@@ -40,10 +40,12 @@ jobs:
       - name: Package Windows installer
         run: npx electron-builder --win -c electron-builder.yml --publish never
 
-      - name: Resolve target tag
+      - name: Resolve target release
         id: tag
         shell: bash
-        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+        # Always upload to the stable release the landing page links to
+        # (releases/latest/download/...), unless a dispatch overrides it.
+        run: echo "tag=${{ github.event.inputs.tag || 'v0.1.0' }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload installer to release
         shell: bash
