@@ -23,13 +23,11 @@
     "dist:all": "npm run build:next && npm run build:electron && electron-builder --mac --win --linux"
   },
   "dependencies": {
-    "@kerembay9/horizon-pay": "^1.0.11",
     "@radix-ui/react-slot": "^1.2.4",
     "bonjour-service": "^1.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron-audio-loopback": "^1.0.6",
-    "lucide-react": "^0.553.0",
     "next": "16.0.3",
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
