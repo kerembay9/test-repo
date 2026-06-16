@@ -1,13 +1,23 @@
 // Small client helpers for talking to the control + upload endpoints.
 
-import type { Snapshot, TrackInfo } from "./types";
+import type { SignalMessage, Snapshot, TrackInfo } from "./types";
 
 interface ControlArgs {
-  action: "setTrack" | "play" | "pause" | "seek" | "stop" | "heartbeat";
+  action:
+    | "setTrack"
+    | "play"
+    | "pause"
+    | "seek"
+    | "stop"
+    | "heartbeat"
+    | "goLive"
+    | "endLive";
   track?: TrackInfo;
   positionSec?: number;
   speakerId?: string;
   speakerName?: string;
+  hostId?: string;
+  latencyMs?: number;
 }
 
 export async function sendControl(args: ControlArgs): Promise<Snapshot> {
@@ -23,6 +33,17 @@ export async function sendControl(args: ControlArgs): Promise<Snapshot> {
     throw new Error(error ?? `control failed (${res.status})`);
   }
   return (await res.json()) as Snapshot;
+}
+
+/** Fire-and-forget a WebRTC signaling message to another peer. */
+export async function sendSignal(msg: SignalMessage): Promise<void> {
+  await fetch("/api/signal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(msg),
+  }).catch(() => {
+    /* signaling is best-effort; ICE will retry via renegotiation if needed */
+  });
 }
 
 export async function uploadTrack(file: File): Promise<TrackInfo> {

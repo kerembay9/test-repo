@@ -7,7 +7,14 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        // Studio-panel: layered dark fill, hairline top highlight (brushed
+        // edge), soft border, and a deep lifted shadow for real depth.
+        "relative isolate overflow-hidden flex flex-col gap-6 rounded-2xl py-6",
+        "text-card-foreground border border-white/[0.06]",
+        "bg-[linear-gradient(180deg,#13172c_0%,#0e1124_100%)]",
+        "shadow-[0_24px_50px_-30px_rgba(0,0,0,0.9)]",
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px",
+        "before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)]",
         className
       )}
       {...props}
@@ -32,7 +39,10 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn(
+        "wordmark font-semibold uppercase tracking-[0.14em] text-foreground/85",
+        className
+      )}
       {...props}
     />
   )

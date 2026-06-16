@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { AudioEngine, type EngineStatus } from "@/lib/sync/audio-engine";
 import { sendControl } from "@/lib/sync/client";
+import { randomId } from "@/lib/sync/id";
 import { useSession } from "@/lib/sync/useSession";
-import type { ChannelRole } from "@/lib/sync/types";
+import { useSignaling } from "@/lib/sync/useSignaling";
+import { SpeakerReceiver } from "@/lib/sync/webrtc";
+import type { ChannelRole, SignalMessage } from "@/lib/sync/types";
 
 const ROLES: { value: ChannelRole; label: string; hint: string }[] = [
   { value: "stereo", label: "Stereo", hint: "Full left + right" },
@@ -18,7 +21,7 @@ function getDeviceId(): string {
   if (typeof window === "undefined") return "";
   let id = localStorage.getItem("surround.deviceId");
   if (!id) {
-    id = crypto.randomUUID();
+    id = randomId();
     localStorage.setItem("surround.deviceId", id);
   }
   return id;
@@ -60,6 +63,19 @@ export default function SpeakerPage() {
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  // Live (WebRTC) streaming from the host.
+  const live = snapshot?.transport.live ?? false;
+  const hostId = snapshot?.transport.hostId ?? null;
+  const receiverRef = useRef<SpeakerReceiver | null>(null);
+  const onSignal = useCallback((msg: SignalMessage) => {
+    void receiverRef.current?.onSignal(msg);
+  }, []);
+  const { send: sendSignal } = useSignaling(
+    deviceId || null,
+    joined && live,
+    onSignal,
+  );
 
   // Join requires a user gesture so the browser lets us produce audio.
   const join = useCallback(async () => {
@@ -110,17 +126,37 @@ export default function SpeakerPage() {
     const tick = setInterval(() => {
       const engine = engineRef.current;
       const snap = snapshotRef.current;
-      if (engine && snap && clock.isSynced && loadedUrlRef.current) {
+      // File reconciliation only; live streaming drives the engine separately.
+      if (
+        engine &&
+        snap &&
+        !snap.transport.live &&
+        clock.isSynced &&
+        loadedUrlRef.current
+      ) {
         engine.apply(snap.transport, clock);
         setStatus(engine.status());
       }
     }, 200);
 
     const hb = setInterval(() => {
-      if (deviceId) {
-        void sendControl({ action: "heartbeat", speakerId: deviceId, speakerName: name });
-      }
-    }, 8000);
+      if (!deviceId) return;
+      void (async () => {
+        let latencyMs: number | undefined;
+        const recv = receiverRef.current;
+        const engine = engineRef.current;
+        if (recv && engine) {
+          const net = await recv.measureLatencyMs();
+          if (net != null) latencyMs = Math.round(net + engine.outputLatencyMs());
+        }
+        await sendControl({
+          action: "heartbeat",
+          speakerId: deviceId,
+          speakerName: name,
+          latencyMs,
+        });
+      })();
+    }, 4000);
 
     return () => {
       clearInterval(tick);
@@ -131,10 +167,37 @@ export default function SpeakerPage() {
   // Apply immediately on each new snapshot too (don't wait for the next tick).
   useEffect(() => {
     const engine = engineRef.current;
-    if (joined && engine && snapshot && clock.isSynced && loadedUrlRef.current) {
+    if (
+      joined &&
+      engine &&
+      snapshot &&
+      !snapshot.transport.live &&
+      clock.isSynced &&
+      loadedUrlRef.current
+    ) {
       engine.apply(snapshot.transport, clock);
     }
   }, [snapshot, joined, clock]);
+
+  // Live mode: receive the host's WebRTC stream and route it through the engine.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!joined || !live || !hostId || !deviceId || !engine) {
+      receiverRef.current?.stop();
+      receiverRef.current = null;
+      engine?.detachStream();
+      return;
+    }
+    const recv = new SpeakerReceiver(hostId, sendSignal, (stream) =>
+      engine.attachStream(stream),
+    );
+    receiverRef.current = recv;
+    return () => {
+      recv.stop();
+      receiverRef.current = null;
+      engine.detachStream();
+    };
+  }, [joined, live, hostId, deviceId, sendSignal]);
 
   useEffect(() => {
     return () => engineRef.current?.destroy();
@@ -143,11 +206,32 @@ export default function SpeakerPage() {
   const track = snapshot?.transport.track;
   const isPlaying = snapshot?.transport.isPlaying ?? false;
 
+  // Host turned us away — free plan speaker limit reached.
+  if (snapshot?.rejected === "limit") {
+    return (
+      <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="flex items-baseline justify-center gap-2">
+          <span className="wordmark-strong text-2xl text-foreground">SURROUND</span>
+          <span className="wordmark-thin text-base text-primary">SPEAKER</span>
+        </div>
+        <h1 className="text-lg font-semibold pt-2">This room is full</h1>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          The host is on the free plan, which allows a limited number of phones.
+          Ask the host to upgrade to Surround Pro to add more speakers.
+        </p>
+      </main>
+    );
+  }
+
   if (!joined) {
     return (
       <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-6 p-6">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Join as a Speaker</h1>
+          <div className="flex items-baseline justify-center gap-2">
+            <span className="wordmark-strong text-2xl text-foreground">SURROUND</span>
+            <span className="wordmark-thin text-base text-primary">SPEAKER</span>
+          </div>
+          <h1 className="text-lg font-semibold pt-2">Join as a speaker</h1>
           <p className="text-muted-foreground max-w-sm">
             Tap below to add this device to the surround system. Your browser
             needs a tap before it can play audio.
@@ -180,7 +264,9 @@ export default function SpeakerPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-bold">{name}</h1>
         <p className="text-sm text-muted-foreground">
-          {track ? (
+          {live ? (
+            <>🔴 Live from host</>
+          ) : track ? (
             <>
               {isPlaying ? "▶ Playing" : "⏸ Paused"} · {track.name}
             </>

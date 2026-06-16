@@ -6,8 +6,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-live: var(--live);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-bricolage);
+  --font-mono: var(--font-inter);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -43,39 +45,44 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Surround "sound field" identity: deep indigo field, warm coral signal, mint
+   reserved for the live/connected state. Dark by default — there is no light
+   theme; the field is the brand. */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: dark;
+  --radius: 0.875rem;
+  --background: #0a0c16;
+  --foreground: #eef0fb;
+  --card: #12162a;
+  --card-foreground: #eef0fb;
+  --popover: #161a2c;
+  --popover-foreground: #eef0fb;
+  --primary: #ff8a4c;
+  --primary-foreground: #1a0e06;
+  --secondary: #1b2138;
+  --secondary-foreground: #eef0fb;
+  --muted: #161a2c;
+  --muted-foreground: #888fb5;
+  --accent: #1b2138;
+  --accent-foreground: #eef0fb;
+  --destructive: #ff6b6b;
+  --border: #2a3050;
+  --input: #2a3050;
+  --ring: #ff8a4c;
+  --live: #6be5d8;
+  --chart-1: #ff8a4c;
+  --chart-2: #6be5d8;
+  --chart-3: #888fb5;
+  --chart-4: #ffb347;
+  --chart-5: #5b8def;
+  --sidebar: #12162a;
+  --sidebar-foreground: #eef0fb;
+  --sidebar-primary: #ff8a4c;
+  --sidebar-primary-foreground: #1a0e06;
+  --sidebar-accent: #1b2138;
+  --sidebar-accent-foreground: #eef0fb;
+  --sidebar-border: #2a3050;
+  --sidebar-ring: #ff8a4c;
 }
 
 .dark {
@@ -118,5 +125,123 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Layered sound-field atmosphere: a warm coral aura up top, a cool mint
+       breath off to one side, and a depth gradient settling into the field. */
+    background-image:
+      radial-gradient(
+        90% 55% at 50% -12%,
+        color-mix(in srgb, var(--primary) 13%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        50% 40% at 88% 8%,
+        color-mix(in srgb, var(--live) 7%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(180deg, #10132a 0%, var(--background) 42%);
+    background-attachment: fixed;
+    position: relative;
   }
+  /* Fine film grain over the whole field for tactile, non-flat depth. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* Keep app content above the grain layer. */
+  body > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* Live/connection status pill. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.3rem 0.75rem 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+.status-pill[data-live="true"] {
+  border-color: color-mix(in srgb, var(--live) 45%, transparent);
+  color: var(--live);
+}
+.status-pill[data-live="false"] {
+  color: var(--muted-foreground);
+}
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+}
+.status-pill[data-live="true"] .status-dot {
+  animation: status-ping 2s ease-out infinite;
+}
+@keyframes status-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Coral-lit panel for the Pro upgrade — the one moment of warm emphasis. */
+.panel-pro {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
+  background:
+    radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 60%),
+    color-mix(in srgb, var(--primary) 5%, var(--card));
+  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+/* Sonar sound-field: rings expanding from a node, the brand signature. */
+@keyframes field-ping {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.field-ring {
+  animation: field-ping 4.4s cubic-bezier(0.2, 0.6, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-ring {
+    animation: none;
+    opacity: 0.1;
+  }
+}
+
+/* Wordmark: heavy display weight over a wide-tracked light second word. */
+.wordmark {
+  font-family: var(--font-display);
+}
+.wordmark-strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.wordmark-thin {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: 0.35em;
 }

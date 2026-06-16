@@ -11,7 +11,11 @@ export const runtime = "nodejs";
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB is plenty for a single song
 
 export async function POST(req: Request) {
-  const form = await req.formData();
+  // Typed structurally to avoid the DOM-vs-Node global FormData type clash;
+  // `.get` exists at runtime on the WHATWG FormData either way.
+  const form = (await req.formData()) as unknown as {
+    get(name: string): unknown;
+  };
   const file = form.get("file");
 
   if (!(file instanceof File)) {

@@ -15,6 +15,20 @@
 import type { ChannelRole, Transport } from "./types";
 import type { ClockSync } from "./clock";
 
+// iOS/iPadOS Safari: createMediaStreamSource on a remote WebRTC stream is
+// silent, so live audio is played from an <audio> element instead. iPadOS 13+
+// reports as "Macintosh", so also sniff touch support.
+function isIOSDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return (
+    /iP(hone|od|ad)/.test(ua) ||
+    (/Macintosh/.test(ua) &&
+      typeof document !== "undefined" &&
+      "ontouchend" in document)
+  );
+}
+
 const DRIFT_NUDGE_THRESHOLD = 0.02; // 20 ms: start gently correcting
 const DRIFT_RESEEK_THRESHOLD = 0.25; // 250 ms: too far off, hard re-seek
 const MAX_RATE_TRIM = 0.03; // clamp playbackRate to [0.97, 1.03]
@@ -30,6 +44,16 @@ export class AudioEngine {
   private ctx: AudioContext;
   private buffer: AudioBuffer | null = null;
   private source: AudioBufferSourceNode | null = null;
+  // Live (WebRTC) source, used instead of a decoded buffer in live mode.
+  private streamSrc: MediaStreamAudioSourceNode | null = null;
+  // Muted keep-alive element: Chrome won't pull a remote WebRTC stream through
+  // Web Audio alone, so an attached HTMLMediaElement is needed to flow the track.
+  private sinkEl: HTMLAudioElement | null = null;
+  // On iOS, createMediaStreamSource on a *remote* WebRTC stream is silent (a
+  // long-standing WebKit bug), so live audio is played straight from the
+  // <audio> element instead of the Web Audio graph. Role/delay-trim don't apply
+  // in this mode, but the phone actually makes sound. Volume is set on the el.
+  private elementMode = false;
 
   // Static routing graph: source -> splitter -> merger -> delay -> gain -> out
   private splitter: ChannelSplitterNode;
@@ -40,6 +64,10 @@ export class AudioEngine {
   private role: ChannelRole = "stereo";
   private volume = 1;
   private trimSec = 0;
+  // Channel count of the decoded buffer. A mono track only fills splitter
+  // output 0, so the routing graph must map "right" back onto channel 0 or it
+  // would emit pure silence.
+  private channels = 2;
 
   // Bookkeeping for the currently scheduled source.
   private startCtxTime = 0; // ctx.currentTime at which playback (offset) begins
@@ -71,11 +99,86 @@ export class AudioEngine {
     if (this.ctx.state !== "running") await this.ctx.resume();
   }
 
+  /**
+   * Route output to a specific device (Chrome AudioContext.setSinkId). Used on
+   * the host so it can monitor a captured loopback through its real speakers
+   * while capturing from a different (BlackHole) device. No-op if unsupported.
+   */
+  async setOutputDevice(deviceId: string): Promise<boolean> {
+    const ctx = this.ctx as AudioContext & {
+      setSinkId?: (id: string) => Promise<void>;
+    };
+    if (typeof ctx.setSinkId !== "function") return false;
+    try {
+      await ctx.setSinkId(deviceId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async loadTrack(url: string): Promise<number> {
     const res = await fetch(url, { cache: "force-cache" });
     const bytes = await res.arrayBuffer();
     this.buffer = await this.ctx.decodeAudioData(bytes);
+    this.channels = this.buffer.numberOfChannels;
+    this.wireRole(); // re-route now that we know the real channel count
     return this.buffer.duration;
+  }
+
+  /**
+   * Play a live MediaStream (WebRTC) through the same role/volume/delay graph
+   * used for files. Replaces any current source. Used in live streaming mode.
+   */
+  attachStream(stream: MediaStream): void {
+    this.detachStream();
+    this.stopSource(); // never run the file source and a live stream together
+
+    const sink = new Audio();
+    sink.setAttribute("playsinline", "");
+    sink.srcObject = stream;
+    this.sinkEl = sink;
+
+    if (isIOSDevice()) {
+      // WebKit can't route a remote stream through Web Audio, so play it from
+      // the element directly. Lose role/delay processing, but get sound.
+      this.elementMode = true;
+      sink.muted = false;
+      sink.volume = this.volume;
+      void sink.play().catch(() => {});
+      void this.ctx.resume();
+      return;
+    }
+
+    sink.muted = true; // routed through Web Audio; the element only flows bytes
+    void sink.play().catch(() => {});
+    this.streamSrc = this.ctx.createMediaStreamSource(stream);
+    this.channels = 2; // remote opus audio is delivered as stereo
+    this.wireRole();
+    this.streamSrc.connect(this.splitter);
+    void this.ctx.resume();
+  }
+
+  /** Audio output latency of this device, in ms (hardware + buffer). */
+  outputLatencyMs(): number {
+    const ctx = this.ctx as AudioContext & {
+      outputLatency?: number;
+      baseLatency?: number;
+    };
+    return (ctx.outputLatency ?? ctx.baseLatency ?? 0) * 1000;
+  }
+
+  detachStream(): void {
+    if (this.streamSrc) {
+      this.streamSrc.disconnect();
+      this.streamSrc = null;
+    }
+    if (this.sinkEl) {
+      this.sinkEl.pause();
+      this.sinkEl.srcObject = null;
+      this.sinkEl = null;
+    }
+    this.elementMode = false;
   }
 
   setRole(role: ChannelRole): void {
@@ -86,6 +189,8 @@ export class AudioEngine {
   setVolume(v: number): void {
     this.volume = clamp(v, 0, 1);
     this.gain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.02);
+    // In element mode (iOS live) the graph is bypassed; set the element volume.
+    if (this.elementMode && this.sinkEl) this.sinkEl.volume = this.volume;
   }
 
   /** Manual per-speaker delay trim (ms) for fine surround alignment. */
@@ -138,6 +243,7 @@ export class AudioEngine {
 
   destroy(): void {
     this.stopSource();
+    this.detachStream();
     void this.ctx.close();
   }
 
@@ -233,7 +339,9 @@ export class AudioEngine {
     }
 
     const L = 0;
-    const R = 1;
+    // Mono buffers only carry signal on splitter output 0; fold "right" onto it
+    // so mono content is audible in every role instead of dropping to silence.
+    const R = this.channels > 1 ? 1 : 0;
     switch (this.role) {
       case "left":
         this.splitter.connect(this.merger, L, 0);

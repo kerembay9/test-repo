@@ -1,0 +1,16 @@
+[Unit]
+Description=Surround Pro buy endpoint (horizon-pay checkout)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/surround-buy
+# Put HORIZON_PAY_API_KEY=... and PORT=8787 in this file (chmod 600).
+EnvironmentFile=/opt/surround-buy/.env
+ExecStart=/usr/bin/node /opt/surround-buy/server.mjs
+Restart=always
+RestartSec=3
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

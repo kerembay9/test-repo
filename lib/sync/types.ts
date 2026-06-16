@@ -30,6 +30,21 @@ export interface Transport {
   positionSec: number;
   /** Server epoch (ms) that `positionSec` refers to. */
   anchorServerTime: number;
+  /** True while the host is streaming live captured audio over WebRTC. */
+  live: boolean;
+  /** Peer id of the host while live, so speakers know whom to answer. */
+  hostId: string | null;
+}
+
+/** WebRTC signaling message relayed between peers via /api/signal. */
+export type SignalType = "offer" | "answer" | "ice";
+
+export interface SignalMessage {
+  from: string;
+  to: string;
+  type: SignalType;
+  /** SDP string for offer/answer, or a serialized ICE candidate. */
+  data: unknown;
 }
 
 export interface Speaker {
@@ -37,6 +52,8 @@ export interface Speaker {
   name: string;
   connected: boolean;
   lastSeen: number;
+  /** Self-reported live-stream latency (ms), used to auto-set the host delay. */
+  latencyMs?: number;
 }
 
 export interface Snapshot {
@@ -44,6 +61,8 @@ export interface Snapshot {
   speakers: Speaker[];
   /** Server epoch (ms) at the moment the snapshot was produced. */
   serverTime: number;
+  /** Set on a connection the host turned away (e.g. free speaker limit). */
+  rejected?: "limit";
 }
 
 /** Compute the playback position (seconds) for a given server time. */
