@@ -1,0 +1,56 @@
+# Builds the Windows desktop installer on a native windows-latest runner and
+# uploads it to a GitHub Release. macOS/Linux are built locally (mac needs the
+# Developer ID cert + notarization), so this workflow covers only Windows —
+# which can't be cross-built from Apple Silicon (wine crashes under qemu).
+name: build-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload the Windows installer to"
+        required: true
+        default: v0.1.0
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write # needed to upload assets to the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next standalone server (+ bundle the next-server runtime)
+        run: npm run build:next
+
+      - name: Build Electron main process
+        run: npm run build:electron
+
+      - name: Package Windows installer
+        run: npx electron-builder --win -c electron-builder.yml --publish never
+
+      - name: Resolve target tag
+        id: tag
+        shell: bash
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload installer to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" \
+            dist/Surround-windows-x64.exe \
+            dist/Surround-windows-x64.exe.blockmap \
+            --clobber
