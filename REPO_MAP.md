@@ -49,4 +49,3 @@ For *how the audio sync works* and the web app itself, see **[README.md](README.
 
 - macOS builds are signed but **not notarized** → public downloaders hit Gatekeeper "damaged" until an Apple app-specific password is provided.
 - Windows exe is **unsigned** → SmartScreen "unknown publisher" warning (needs a Windows code-signing cert).
-- Unused root dependencies (safe to drop): **`lucide-react`** (no references anywhere) and **`@kerembay9/horizon-pay`** (only used by `buy-service/`, which declares its own).
