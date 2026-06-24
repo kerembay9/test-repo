@@ -33,6 +33,7 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import { HostScreen } from "./src/hostmode/HostScreen";
+import { GuestScreen } from "./src/hostmode/GuestScreen";
 
 // Native speaker client. The synchronized-audio engine (WebRTC + Web Audio
 // channel routing + drift correction) only exists in the web app, so the app
@@ -222,7 +223,7 @@ function AppInner() {
 
   const [ready, setReady] = useState(false);
   const [host, setHost] = useState<string | null>(null);
-  const [mode, setMode] = useState<"join" | "host">("join");
+  const [mode, setMode] = useState<"join" | "host" | "guest">("join");
   const [deviceId, setDeviceId] = useState("");
   const [name, setName] = useState("");
   const [hostInput, setHostInput] = useState("");
@@ -365,6 +366,17 @@ function AppInner() {
     );
   }
 
+  // Phone-guest mode: join another phone hosting over the LAN.
+  if (mode === "guest") {
+    return (
+      <GuestScreen
+        guestId={deviceId}
+        name={name || "My phone"}
+        onExit={() => setMode("join")}
+      />
+    );
+  }
+
   // Onboarding.
   if (!host) {
     return (
@@ -466,15 +478,26 @@ function AppInner() {
                 <Text style={styles.dividerText}>no computer?</Text>
                 <View style={styles.dividerLine} />
               </View>
-              <Pressable
-                style={styles.ghost}
-                onPress={() => {
-                  setError(null);
-                  setMode("host");
-                }}
-              >
-                <Text style={styles.ghostText}>Host on this phone</Text>
-              </Pressable>
+              <View style={styles.phoneRow}>
+                <Pressable
+                  style={styles.phoneBtn}
+                  onPress={() => {
+                    setError(null);
+                    setMode("host");
+                  }}
+                >
+                  <Text style={styles.phoneBtnText}>Host on this phone</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.phoneBtn}
+                  onPress={() => {
+                    setError(null);
+                    setMode("guest");
+                  }}
+                >
+                  <Text style={styles.phoneBtnText}>Join a phone host</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </SafeAreaView>
@@ -655,6 +678,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
   },
+  phoneRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  phoneBtn: {
+    flex: 1,
+    backgroundColor: C.raise,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  phoneBtnText: { fontFamily: F.semibold, color: C.ink, fontSize: 13 },
   body: { fontFamily: F.regular, color: C.ink, textAlign: "center", marginBottom: 18, fontSize: 15 },
 
   // connection bar

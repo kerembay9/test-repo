@@ -127,22 +127,22 @@ Concretely verified here: the pure-logic modules (`clock.ts`, `transport.ts`,
 `protocol.ts`) and that the UI option renders and is gated. Not verified:
 end-to-end audio between two phones — that requires device testing.
 
-**Important UI gap (intentional, this iteration):** the *host* side is wired
-into the onboarding screen ("Host on this phone" → `HostScreen`). The *guest*
-side is implemented as a class (`GuestSession`, with `LanSignalGuest` discovery)
-but is **not yet wired into the join UI** — the onboarding "Found nearby" list
-and the "Join as speaker" button still target a *computer* host and open its
-`/speaker` page in a WebView. So a phone can start hosting, but joining a phone
-host from another phone needs the guest-join wiring described in Follow-ups.
-This is the next step to make the loop complete.
+Both ends are now wired into the onboarding screen under a "no computer?"
+divider: **"Host on this phone"** → `HostScreen` (capture + advertise +
+broadcast) and **"Join a phone host"** → `GuestScreen` (browse
+`_surroundhost._tcp` → pick a host → `GuestSession` answers the offer and plays
+the incoming audio). The original computer-host join flow (the "Found nearby"
+list and "Join as speaker" WebView) is untouched and still targets a computer
+host. Remote audio from `react-native-webrtc` routes to the device output
+automatically once the track arrives; the guest hook keeps a stream reference so
+it isn't garbage-collected.
 
 ## Follow-ups
 
-- **Wire guest-join into onboarding** (the immediate next step): browse
-  `_surroundhost._tcp` alongside the computer-host browse, and when a *phone*
-  host is chosen, drive a `GuestSession` + native audio playout
-  (`react-native-webrtc` RTCView / InCallManager) instead of the WebView. Until
-  this lands, only the host half is reachable from the UI.
+- **Audio routing polish**: on some devices remote audio defaults to the earpiece;
+  add `InCallManager` (or an `AudioSession` config) on the guest to force the
+  loud speaker, and surface per-speaker channel role / volume / delay-trim for
+  phone-host guests (reuse the web `/speaker` controls).
 - File-sync source for phone-host (each speaker fetches a track the host serves
   over the same TCP socket) — tighter sync than live capture, reuses
   `audio-engine.ts` math.

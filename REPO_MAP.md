@@ -49,4 +49,4 @@ For *how the audio sync works* and the web app itself, see **[README.md](README.
 
 - macOS builds are signed but **not notarized** → public downloaders hit Gatekeeper "damaged" until an Apple app-specific password is provided.
 - Windows exe is **unsigned** → SmartScreen "unknown publisher" warning (needs a Windows code-signing cert).
-- **Phone-host mode (in progress)** — lets a phone be the host with no computer (LAN-only, live audio over WebRTC). Host side + core logic landed under `mobile/src/hostmode/`; the guest-join UI is still a follow-up. Needs a dev build (native `react-native-webrtc` / `react-native-tcp-socket`) and two-device testing. See `docs/superpowers/specs/2026-06-24-phone-host-mode-design.md`.
+- **Phone-host mode (needs device testing)** — lets a phone be the host with no computer (LAN-only, live audio over WebRTC). Both ends landed under `mobile/src/hostmode/` and wired into onboarding ("Host on this phone" / "Join a phone host"). Needs a dev build (native `react-native-webrtc` / `react-native-tcp-socket`) and two-device testing — not runnable in Expo Go or CI. See `docs/superpowers/specs/2026-06-24-phone-host-mode-design.md`.
