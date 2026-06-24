@@ -16,10 +16,11 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan a host's QR code to join its speaker group.",
-        "NSMicrophoneUsageDescription": "Used only if the host requests a live two-way audio session; this app plays back synchronized audio.",
+        "NSMicrophoneUsageDescription": "Captures this phone's audio when you host a session, to stream it to nearby speakers.",
         "NSLocalNetworkUsageDescription": "Finds and connects to the host computer on your local Wi-Fi to receive synchronized audio.",
         "NSBonjourServices": [
-          "_surround._tcp"
+          "_surround._tcp",
+          "_surroundhost._tcp"
         ],
         "UIBackgroundModes": [
           "audio"
@@ -52,7 +53,6 @@
         "android.permission.RECORD_AUDIO"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -84,7 +84,8 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@config-plugins/react-native-webrtc"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
