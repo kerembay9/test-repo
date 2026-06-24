@@ -32,6 +32,8 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import { HostScreen } from "./src/hostmode/HostScreen";
+import { GuestScreen } from "./src/hostmode/GuestScreen";
 
 // Native speaker client. The synchronized-audio engine (WebRTC + Web Audio
 // channel routing + drift correction) only exists in the web app, so the app
@@ -64,6 +66,12 @@ const F = {
 
 const HOST_KEY = "surround.hostUrl";
 const NAME_KEY = "surround.deviceName";
+const ID_KEY = "surround.deviceId";
+
+/** Stable per-install id used to identify this phone as a host/guest peer. */
+function freshDeviceId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 type Discovered = { name: string; url: string };
 
@@ -215,6 +223,8 @@ function AppInner() {
 
   const [ready, setReady] = useState(false);
   const [host, setHost] = useState<string | null>(null);
+  const [mode, setMode] = useState<"join" | "host" | "guest">("join");
+  const [deviceId, setDeviceId] = useState("");
   const [name, setName] = useState("");
   const [hostInput, setHostInput] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -232,14 +242,21 @@ function AppInner() {
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
     void (async () => {
-      const [h, n] = await Promise.all([
+      const [h, n, storedId] = await Promise.all([
         AsyncStorage.getItem(HOST_KEY),
         AsyncStorage.getItem(NAME_KEY),
+        AsyncStorage.getItem(ID_KEY),
       ]);
       if (h) {
         setHost(h);
         setHostInput(h);
       }
+      let id = storedId;
+      if (!id) {
+        id = freshDeviceId();
+        await AsyncStorage.setItem(ID_KEY, id);
+      }
+      setDeviceId(id);
       setName(n ?? "My phone");
       setReady(true);
     })();
@@ -338,6 +355,28 @@ function AppInner() {
     );
   }
 
+  // Phone-host mode: this phone is the source, others join over the LAN.
+  if (mode === "host") {
+    return (
+      <HostScreen
+        hostId={deviceId}
+        hostName={name || "My phone"}
+        onExit={() => setMode("join")}
+      />
+    );
+  }
+
+  // Phone-guest mode: join another phone hosting over the LAN.
+  if (mode === "guest") {
+    return (
+      <GuestScreen
+        guestId={deviceId}
+        name={name || "My phone"}
+        onExit={() => setMode("join")}
+      />
+    );
+  }
+
   // Onboarding.
   if (!host) {
     return (
@@ -433,6 +472,32 @@ function AppInner() {
               >
                 <Text style={styles.ghostText}>Scan host QR code</Text>
               </Pressable>
+
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>no computer?</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <View style={styles.phoneRow}>
+                <Pressable
+                  style={styles.phoneBtn}
+                  onPress={() => {
+                    setError(null);
+                    setMode("host");
+                  }}
+                >
+                  <Text style={styles.phoneBtnText}>Host on this phone</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.phoneBtn}
+                  onPress={() => {
+                    setError(null);
+                    setMode("guest");
+                  }}
+                >
+                  <Text style={styles.phoneBtnText}>Join a phone host</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </SafeAreaView>
@@ -604,6 +669,26 @@ const styles = StyleSheet.create({
   ctaText: { fontFamily: F.bold, color: "#1A0E06", fontSize: 16, letterSpacing: 0.3 },
   ghost: { paddingVertical: 14, alignItems: "center" },
   ghostText: { fontFamily: F.semibold, color: C.inkSoft, fontSize: 14 },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.line },
+  dividerText: {
+    fontFamily: F.medium,
+    color: C.inkSoft,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  phoneRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  phoneBtn: {
+    flex: 1,
+    backgroundColor: C.raise,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  phoneBtnText: { fontFamily: F.semibold, color: C.ink, fontSize: 13 },
   body: { fontFamily: F.regular, color: C.ink, textAlign: "center", marginBottom: 18, fontSize: 15 },
 
   // connection bar

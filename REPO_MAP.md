@@ -45,7 +45,8 @@ For *how the audio sync works* and the web app itself, see **[README.md](README.
 - `buy-service/README.md` — payment microservice.
 - `mobile/CLAUDE.md`, `mobile/AGENTS.md`, `mobile/APP_STORE_CHECKLIST.md`, `mobile/store/` — mobile app + store listing.
 
-## Known open items (as of 2026-06-16)
+## Known open items (as of 2026-06-24)
 
 - macOS builds are signed but **not notarized** → public downloaders hit Gatekeeper "damaged" until an Apple app-specific password is provided.
 - Windows exe is **unsigned** → SmartScreen "unknown publisher" warning (needs a Windows code-signing cert).
+- **Phone-host mode (needs device testing)** — lets a phone be the host with no computer (LAN-only, live audio over WebRTC). Both ends landed under `mobile/src/hostmode/` and wired into onboarding ("Host on this phone" / "Join a phone host"). Needs a dev build (native `react-native-webrtc` / `react-native-tcp-socket`) and two-device testing — not runnable in Expo Go or CI. See `docs/superpowers/specs/2026-06-24-phone-host-mode-design.md`.
